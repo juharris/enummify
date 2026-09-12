@@ -1,0 +1,9 @@
+*.bundle
+*.gem
+/.bundle/
+/.rubocop_cache/
+/.ruby-lsp/
+/checksums/
+/pkg/
+/tmp/
+/vendor/

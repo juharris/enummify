@@ -1,0 +1,9 @@
+--parser=prism
+--enable-experimental-rbs-comments
+--dir=.
+--ignore=/.ruby-lsp
+--ignore=/pkg
+--ignore=/tmp
+--ignore=/vendor
+# This fixture intentionally contains errors verified by the CI type-check task.
+--ignore=/test/types/invalid.rb

@@ -6,12 +6,19 @@ require 'open3'
 binary = File.join(Gem::Specification.find_by_name('sorbet-static').full_gem_path, 'libexec', 'sorbet')
 command = [binary, '--no-error-count', '--no-error-sections', '--color=never']
 
+unless ARGV.empty?
+  # Consumer checks must not resolve types from the checkout's implementation.
+  command.concat(%w[--no-config --parser=prism --enable-experimental-rbs-comments])
+  command.concat(ARGV)
+  command << File.expand_path('enums.rb', __dir__)
+end
+
 output, status = Open3.capture2e(*command)
 abort output unless status.success?
 
-fixture = 'test/types/invalid.rb'
+fixture = File.expand_path('invalid.rb', __dir__)
 expected = File.readlines(fixture).each_with_index.filter_map do |line, index|
-  match = line.match(/^# expect-type-error: (\d+)/)
+  match = line.match(/^\s*# expect-type-error: (\d+)/)
   [fixture, index + 2, match[1]] if match
 end
 
@@ -24,4 +31,4 @@ unless status.exitstatus == 100 && actual.sort == expected.sort
   abort "Unexpected Sorbet diagnostics (exit #{status.exitstatus}).\nExpected: #{expected.inspect}\nActual: #{actual.inspect}"
 end
 
-puts "Sorbet: library and tests passed; all #{expected.length} invalid calls rejected."
+puts "Sorbet: valid usage passed; all #{expected.length} invalid calls rejected."

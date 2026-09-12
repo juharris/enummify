@@ -11,10 +11,15 @@ Rake::TestTask.new do |task|
   task.test_files = FileList['test/**/*_test.rb']
 end
 
+desc 'Build and verify the installed gem and its exported RBI'
+task 'test:package' => :build do
+  ruby 'test/check_package.rb'
+end
+
 desc 'Check valid and invalid enum usage with Sorbet via RBS comments'
 task :typecheck do
   ruby 'test/types/check_sorbet.rb'
 end
 
-desc 'Run tests, style checks, and type checks'
-task default: %i[test rubocop typecheck]
+desc 'Run tests, style checks, type checks, and package checks'
+task default: %i[test rubocop typecheck test:package]

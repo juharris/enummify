@@ -3,6 +3,8 @@
 --dir=.
 --ignore=/.ruby-lsp
 --ignore=/pkg
+# Check the shipped interface separately from its implementation.
+--ignore=/rbi
 --ignore=/tmp
 --ignore=/vendor
 # This fixture intentionally contains errors verified by the CI type-check task.

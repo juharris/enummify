@@ -2,7 +2,7 @@
 
 Immutable, typed Ruby enums with RBS comments.
 Enummify has no runtime dependencies and does not use Sorbet APIs or `T::Enum`.
-Requires Ruby 4.0.6 or newer.
+Requires Ruby 3.2 or newer.
 
 ## Usage
 
@@ -41,8 +41,7 @@ Invalid members, duplicate names, duplicate serialized values, and aliases raise
 Concrete enum classes cannot be subclassed.
 The `new` constructor is private.
 
-Each constant assignment immediately registers its member through Ruby's `const_added` callback.
-Lookup and enumeration only read the registry.
+Each constant assignment immediately registers its member.
 The class can be reopened to add members and methods, including after a lookup.
 Finish member declarations during application loading before concurrent use; concurrent mutation is unsupported.
 
@@ -62,63 +61,19 @@ status = ExecutionStatus.deserialize(JSON.parse(json).fetch('status'))
 
 ## Typing
 
-Types are declared as RBS method and constant comments in the Ruby sources and checked in CI with Sorbet's static checker.
+Types are declared as RBS method and constant comments in the Ruby sources.
 Inherited `.deserialize` and `.values` return the concrete enum type through RBS's `instance` type.
 A method annotated `#: (ExecutionStatus) -> String` can therefore require `ExecutionStatus` and reject a plain string or an unrelated enum.
 
 Sorbet is a development dependency only; the gem does not load `sorbet-runtime` or use `T` APIs.
-When using Sorbet, enable `--parser=prism` and `--enable-experimental-rbs-comments`, and include the gem's Ruby sources in the checker's inputs.
+The gem ships `rbi/enummify.rbi` with RBS comments describing its public API.
+[Tapioca imports this interface](https://github.com/Shopify/tapioca#importing-hand-written-signatures-from-gems-rbi-folder) during the application's normal gem RBI setup.
+When using Sorbet, enable `--parser=prism` and `--enable-experimental-rbs-comments` to read these annotations.
 The trailing constant annotations in the Ruby example support Sorbet's strict checking.
 
 Enum instance constants do **not** provide automatic exhaustive `case` checking.
 Enummify does not emulate the typechecker's special support for individual `T::Enum` members.
 
-## Setup
+## Contributing
 
-Use Ruby 4.0.6.
-The `.ruby-version` file pins local development and all CI jobs to Ruby 4.0.6.
-
-```shell
-bundle install
-```
-
-## Testing
-
-```shell
-bundle exec rake test
-```
-
-## Style and typing
-
-```shell
-bundle exec rubocop --cache true
-bundle exec rake typecheck
-```
-
-Type checks cover the library and runtime tests, along with valid usage and intentional errors such as passing another enum, a raw string, or a possibly missing member.
-They also reject unknown member constants.
-The Sorbet check verifies valid fixtures and each marked invalid call in `test/types/`.
-
-Apply style fixes:
-
-```shell
-bundle exec rubocop --autocorrect --cache true
-```
-
-Run all checks:
-
-```shell
-bundle exec rake
-```
-
-## Building and publishing
-
-```shell
-bundle exec rake build
-```
-
-GitHub Actions tests and builds the gem on Ruby 4.0.6, with style and type checks sharing the Ubuntu job's Ruby setup.
-After checks pass on `main`, the workflow publishes versions that are not already on RubyGems using trusted publishing.
-Before the first release, register a [pending trusted publisher](https://rubygems.org/profile/oidc/pending_trusted_publishers) for gem `enummify`, repository `juharris/enummify`, and workflow `ruby_build_test.yml`.
-Leave the environment field empty, matching this workflow.
-Bump `Enummify::VERSION` in `lib/enummify/version.rb` to release a new version.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, style and typing guidelines, and release instructions.

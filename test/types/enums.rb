@@ -1,7 +1,7 @@
 # typed: strict
 # frozen_string_literal: true
 
-require_relative '../../lib/enummify'
+require 'enummify'
 
 module TypeExamples
   class OtherStatus < Enummify::Enum
@@ -42,6 +42,9 @@ consumer = TypeExamples::Consumer.new
 consumer.serialize(TypeExamples::Status::Pending)
 consumer.serialize(TypeExamples::Status::RUNNING)
 consumer.serialize(TypeExamples::Status::Succeeded)
+consumer.serialize(TypeExamples::Status::Pending.clone(freeze: false))
+consumer.serialize(TypeExamples::Status::Pending.dup)
+consumer.serialize(TypeExamples::Status._load('RUNNING'))
 consumer.serialize(consumer.deserialize)
 consumer.values.each { |member| consumer.serialize(member) }
 member = consumer.try_deserialize

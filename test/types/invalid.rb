@@ -21,3 +21,8 @@ consumer.serialize(TypeExamples::Status.try_deserialize('Pending'))
 consumer.serialize(TypeExamples::Status::Running)
 # expect-type-error: 7031
 TypeExamples::Status.new
+
+class InvalidStatus < Enummify::Enum
+  # expect-type-error: 7002
+  Pending = new(:pending) #: InvalidStatus
+end

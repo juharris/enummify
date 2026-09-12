@@ -6,7 +6,7 @@ require_relative 'lib/enummify/version'
 Gem::Specification.new do |spec|
   spec.authors = ['Justin D. Harris']
   spec.description = 'Immutable, typed Ruby enums with RBS comments and no runtime dependencies.'
-  spec.files = Dir['lib/**/*.rb', 'LICENSE.txt', 'README.md']
+  spec.files = Dir['lib/**/*.rb', 'rbi/**/*.rbi', 'CONTRIBUTING.md', 'LICENSE.txt', 'README.md']
   spec.homepage = 'https://github.com/juharris/enummify'
   spec.license = 'MIT'
   spec.metadata = {
@@ -14,7 +14,7 @@ Gem::Specification.new do |spec|
     'source_code_uri' => 'https://github.com/juharris/enummify'
   }
   spec.name = 'enummify'
-  spec.required_ruby_version = '>= 4.0.6'
+  spec.required_ruby_version = '>= 3.2'
   spec.summary = 'Typed Ruby enums using RBS.'
   spec.version = Enummify::VERSION
 

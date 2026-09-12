@@ -1,7 +1,7 @@
 # Enummify
 
 Immutable, typed Ruby enums with RBS comments.
-Enummify has no runtime dependencies and does not use Sorbet APIs or `T::Enum`.
+Enummify has no runtime dependencies and does not use Sorbet's `T::Enum`.
 Requires Ruby 3.2 or newer.
 
 ## Usage
@@ -65,10 +65,10 @@ Types are declared as RBS method and constant comments in the Ruby sources.
 Inherited `.deserialize` and `.values` return the concrete enum type through RBS's `instance` type.
 A method annotated `#: (ExecutionStatus) -> String` can therefore require `ExecutionStatus` and reject a plain string or an unrelated enum.
 
-Sorbet is a development dependency only; the gem does not load `sorbet-runtime` or use `T` APIs.
-The gem ships `rbi/enummify.rbi` with RBS comments describing its public API.
+Sorbet is a development dependency only; the runtime does not load `sorbet-runtime` or use `T` APIs.
+The gem ships standard Sorbet signatures in `rbi/enummify.rbi` describing its public API.
 [Tapioca imports this interface](https://github.com/Shopify/tapioca#importing-hand-written-signatures-from-gems-rbi-folder) during the application's normal gem RBI setup.
-When using Sorbet, enable `--parser=prism` and `--enable-experimental-rbs-comments` to read these annotations.
+To use RBS comments in application code, enable Sorbet's `--parser=prism` and `--enable-experimental-rbs-comments` flags.
 The trailing constant annotations in the Ruby example support Sorbet's strict checking.
 
 Enum instance constants do **not** provide automatic exhaustive `case` checking.

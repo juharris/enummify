@@ -4,39 +4,41 @@
 module Enummify
   # A typed set of immutable, named instances with string serialization.
   class Enum
-    #: (String) -> instance
+    extend T::Sig
+
+    sig { params(serialized: String).returns(T.attached_class) }
     def self._load(serialized); end
 
-    #: (String) -> instance
+    sig { params(serialized: String).returns(T.attached_class) }
     def self.deserialize(serialized); end
 
-    #: (?String?) -> instance
+    sig { params(serialized: T.nilable(String)).returns(T.attached_class) }
     def self.new(serialized = nil); end
 
-    #: (String) -> instance?
+    sig { params(serialized: String).returns(T.nilable(T.attached_class)) }
     def self.try_deserialize(serialized); end
 
-    #: () -> Array[instance]
+    sig { returns(T::Array[T.attached_class]) }
     def self.values; end
 
     private_class_method :new
 
-    #: (Integer) -> String
+    sig { params(_depth: Integer).returns(String) }
     def _dump(_depth); end
 
-    #: (?freeze: bool?) -> self
+    sig { params(freeze: T.nilable(T::Boolean)).returns(T.self_type) }
     def clone(freeze: true); end
 
-    #: () -> self
+    sig { returns(T.self_type) }
     def dup; end
 
-    #: () -> String
+    sig { returns(String) }
     def inspect; end
 
-    #: () -> String
+    sig { returns(String) }
     def serialize; end
 
-    #: () -> String
+    sig { returns(String) }
     def to_s; end
   end
 end

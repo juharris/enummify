@@ -7,9 +7,12 @@ binary = File.join(Gem::Specification.find_by_name('sorbet-static').full_gem_pat
 command = [binary, '--no-error-count', '--no-error-sections', '--color=never']
 
 unless ARGV.empty?
+  command.concat(['--no-config'] + ARGV)
+  output, status = Open3.capture2e(*command)
+  abort "Exported RBI failed standard Sorbet checking:\n#{output}" unless status.success?
+
   # Consumer checks must not resolve types from the checkout's implementation.
-  command.concat(%w[--no-config --parser=prism --enable-experimental-rbs-comments])
-  command.concat(ARGV)
+  command.concat(%w[--parser=prism --enable-experimental-rbs-comments])
   command << File.expand_path('enums.rb', __dir__)
 end
 

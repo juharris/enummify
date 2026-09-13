@@ -9,6 +9,10 @@ module Enummify
     sig { params(serialized: String).returns(T.attached_class) }
     def self.deserialize(serialized); end
 
+    class << self
+      alias _load deserialize
+    end
+
     sig { params(serialized: String).returns(T.nilable(T.attached_class)) }
     def self.try_deserialize(serialized); end
 

@@ -4,12 +4,31 @@
 require 'test/unit'
 require_relative '../lib/enummify'
 
-# Named fixtures support static member types and Marshal class resolution.
+# Named fixtures keep diagnostics stable and support static member types and Marshal class resolution.
 module EnumTest
+  class AliasStatus < Enummify::Enum
+    VALUE = new('value') #: AliasStatus
+  end
+
+  class DefaultFirstStatus < Enummify::Enum
+    FIRST = new #: DefaultFirstStatus
+  end
+
+  class DefaultSecondStatus < Enummify::Enum
+    FIRST = new('SECOND') #: DefaultSecondStatus
+  end
+
   class DefaultStatus < Enummify::Enum
     FROM_NIL = new(nil) #: DefaultStatus
     PENDING = new #: DefaultStatus
     RUNNING = new #: DefaultStatus
+  end
+
+  class DuplicateStatus < Enummify::Enum
+    FIRST = new('duplicate') #: DuplicateStatus
+  end
+
+  class EmptyStatus < Enummify::Enum
   end
 
   class OtherStatus < Enummify::Enum
@@ -24,10 +43,10 @@ module EnumTest
   class EnumTest < Test::Unit::TestCase
     #: -> void
     def test_aliases_are_rejected
-      enum = enum_with_value('value')
-
-      assert_raises(ArgumentError) { enum.const_set(:ALIAS, enum_member(enum, :VALUE)) }
-      assert_same(enum_member(enum, :VALUE), enum.deserialize('value'))
+      error = assert_raises(ArgumentError) { AliasStatus.const_set(:ALIAS, AliasStatus::VALUE) }
+      assert_equal('Duplicate serialized value for EnumTest::AliasStatus: "value" is already used',
+                   error.message)
+      assert_same(AliasStatus::VALUE, AliasStatus.deserialize('value'))
     end
 
     #: () -> void
@@ -79,31 +98,43 @@ module EnumTest
 
     #: () -> void
     def test_deserialization_reports_unknown_values
-      ['missing', 'PENDING', ''].each do |value|
-        assert_raises(ArgumentError) { Status.deserialize(value) }
+      {
+        'missing' => 'Unknown EnumTest::Status value: "missing"',
+        'PENDING' => 'Unknown EnumTest::Status value: "PENDING"',
+        '' => 'Unknown EnumTest::Status value: ""'
+      }.each do |value, expected_message|
+        error = assert_raises(ArgumentError) { Status.deserialize(value) }
+        assert_equal(expected_message, error.message)
         assert_nil(Status.try_deserialize(value))
       end
     end
 
     #: () -> void
     def test_duplicate_serializations_are_rejected
-      [%w[duplicate duplicate], [nil, 'FIRST'], ['SECOND', nil]].each do |first_serialization, second_serialization|
-        enum = Class.new(Enummify::Enum)
-        first = declare_member(enum, :FIRST, first_serialization)
+      {
+        DuplicateStatus => ['duplicate', 'Duplicate serialized value for EnumTest::DuplicateStatus: "duplicate" ' \
+                                         'is already used'],
+        DefaultFirstStatus => ['FIRST', 'Duplicate serialized value for EnumTest::DefaultFirstStatus: "FIRST" ' \
+                                        'is already used'],
+        DefaultSecondStatus => [nil, 'Duplicate serialized value for EnumTest::DefaultSecondStatus: "SECOND" ' \
+                                     'is already used']
+      }.each do |enum, (second_serialization, expected_message)|
+        first = enum_member(enum, :FIRST)
 
-        assert_raises(ArgumentError) { declare_member(enum, :SECOND, second_serialization) }
+        error = assert_raises(ArgumentError) { declare_member(enum, :SECOND, second_serialization) }
+        assert_equal(expected_message, error.message)
         assert_same(first, enum.deserialize(first.serialize))
       end
     end
 
     #: () -> void
     def test_empty_enum_values_are_memoized
-      enum = Class.new(Enummify::Enum)
-      empty_values = enum.values
+      empty_values = EmptyStatus.values
       assert_equal([], empty_values)
-      assert_same(empty_values, enum.values)
-      assert_raises(ArgumentError) { enum.deserialize('value') }
-      assert_nil(enum.try_deserialize('value'))
+      assert_same(empty_values, EmptyStatus.values)
+      error = assert_raises(ArgumentError) { EmptyStatus.deserialize('value') }
+      assert_equal('Unknown EnumTest::EmptyStatus value: "value"', error.message)
+      assert_nil(EmptyStatus.try_deserialize('value'))
     end
 
     #: () -> void
@@ -112,21 +143,27 @@ module EnumTest
       assert_not_equal(Status::PENDING, Status::RUNNING)
       assert_not_equal(Status::PENDING, 'pending')
       assert_equal(Status::PENDING, Status.deserialize('pending'))
+    end
 
-      indexed = { Status::PENDING => :status, OtherStatus::PENDING => :other_status }
-      assert_equal(2, indexed.size)
-      assert_equal(:status, indexed[Status.deserialize('pending')])
-      assert_equal(:other_status, indexed[OtherStatus.deserialize('pending')])
+    #: () -> void
+    def test_hash_keys_preserve_member_identity
+      indexed = { Status::PENDING => :pending, Status::RUNNING => :running, OtherStatus::PENDING => :other_pending }
+
+      assert_equal(3, indexed.size)
+      assert_equal(:pending, indexed.fetch(Status.deserialize('pending')))
+      assert_equal(:running, indexed.fetch(Status.deserialize('running')))
+      assert_equal(:other_pending, indexed.fetch(OtherStatus.deserialize('pending')))
+
+      indexed[Status.deserialize('pending')] = :updated
+      assert_equal(3, indexed.size)
+      assert_equal(:updated, indexed.fetch(Status::PENDING))
+      assert_equal(:other_pending, indexed.fetch(OtherStatus::PENDING))
     end
 
     #: () -> void
     def test_inspection_includes_class_and_serialization
-      inspected = Status::PENDING.inspect
-
-      assert_include(inspected, Status.name)
-      assert_include(inspected, 'pending')
-      assert_equal(inspected, Status.deserialize('pending').inspect)
-      assert_not_match(/0x[0-9a-f]+/i, inspected)
+      assert_equal('#<EnumTest::Status: "pending">', Status::PENDING.inspect)
+      assert_equal('#<EnumTest::Status: "pending">', Status.deserialize('pending').inspect)
     end
 
     #: () -> void
@@ -143,10 +180,18 @@ module EnumTest
 
     #: () -> void
     def test_members_are_frozen
-      fixture_members.each do |value|
+      {
+        DefaultStatus::FROM_NIL => 'can\'t modify frozen EnumTest::DefaultStatus: #<EnumTest::DefaultStatus: "FROM_NIL">',
+        DefaultStatus::PENDING => 'can\'t modify frozen EnumTest::DefaultStatus: #<EnumTest::DefaultStatus: "PENDING">',
+        DefaultStatus::RUNNING => 'can\'t modify frozen EnumTest::DefaultStatus: #<EnumTest::DefaultStatus: "RUNNING">',
+        Status::PENDING => 'can\'t modify frozen EnumTest::Status: #<EnumTest::Status: "pending">',
+        Status::RUNNING => 'can\'t modify frozen EnumTest::Status: #<EnumTest::Status: "running">',
+        OtherStatus::PENDING => 'can\'t modify frozen EnumTest::OtherStatus: #<EnumTest::OtherStatus: "pending">'
+      }.each do |value, expected_message|
         assert_predicate(value, :frozen?)
         assert_predicate(value.serialize, :frozen?)
-        assert_raises(FrozenError) { value.instance_variable_set(:@extra, true) }
+        error = assert_raises(FrozenError) { value.instance_variable_set(:@extra, true) }
+        assert_equal(expected_message, error.message)
       end
     end
 
@@ -172,7 +217,8 @@ module EnumTest
 
       assert_equal('mutable', enum_member(enum, :VALUE).serialize)
       assert_predicate(enum_member(enum, :VALUE).serialize, :frozen?)
-      assert_raises(FrozenError) { enum_member(enum, :VALUE).serialize.replace('changed') }
+      error = assert_raises(FrozenError) { enum_member(enum, :VALUE).serialize.replace('changed') }
+      assert_equal('can\'t modify frozen String: "mutable"', error.message)
       assert_same(enum_member(enum, :VALUE), enum.deserialize('mutable'))
       assert_nil(enum.try_deserialize('changed'))
     end

@@ -14,11 +14,16 @@ module TypeExamples
     SUCCEEDED = new('succeeded') #: Status
   end
 
-  # These signatures verify that inherited methods preserve the concrete enum type.
+  # These signatures verify that consumer code preserves the concrete enum type.
   class Consumer
     #: () -> Status
     def deserialize
       Status.deserialize('RUNNING')
+    end
+
+    #: () -> Hash[Status, String]
+    def labels
+      { Status::PENDING => 'Waiting', Status::RUNNING => 'Active', Status::SUCCEEDED => 'Done' }
     end
 
     #: (Status) -> String
@@ -39,6 +44,7 @@ module TypeExamples
 end
 
 consumer = TypeExamples::Consumer.new
+consumer.labels.fetch(TypeExamples::Status.deserialize('PENDING'))
 consumer.serialize(TypeExamples::Status::PENDING)
 consumer.serialize(TypeExamples::Status::RUNNING)
 consumer.serialize(TypeExamples::Status::SUCCEEDED)

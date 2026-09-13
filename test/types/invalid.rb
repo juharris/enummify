@@ -4,6 +4,10 @@
 # Every call must remain a type error, even when the serialized strings coincide.
 consumer = TypeExamples::Consumer.new
 # expect-type-error: 7002
+consumer.labels.fetch('PENDING')
+# expect-type-error: 7002
+consumer.labels.fetch(TypeExamples::OtherStatus::PENDING)
+# expect-type-error: 7002
 consumer.serialize('PENDING')
 # expect-type-error: 7002
 consumer.serialize(TypeExamples::OtherStatus::PENDING)

@@ -14,9 +14,8 @@ module Enummify
 
       member = const_get(constant, false) #: as Enum
       serialized = member.send(:finalize, constant)
-      existing = @serialized_to_value[serialized]
-      if existing
-        raise ArgumentError, "Duplicate serialized value for #{name}: #{serialized.inspect} is already taken by #{existing.inspect}"
+      if @serialized_to_value.key?(serialized)
+        raise ArgumentError, "Duplicate serialized value for #{name}: #{serialized.inspect} is already used"
       end
 
       @serialized_to_value[serialized] = member

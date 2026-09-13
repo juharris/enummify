@@ -27,7 +27,6 @@ Status.deserialize('something else') # => raises ArgumentError
 ```
 
 Each member is an instance of its own enum class.
-Members from different enum classes are distinct even when they serialize to the same string.
 Members and their serialized strings are frozen.
 
 Declare members directly as constants in the enum class body.
@@ -48,8 +47,8 @@ Serialize at JSON, configuration, and persistence boundaries:
 
 require 'json'
 
-json = JSON.generate(status: Status::RUNNING.serialize)
-status = Status.deserialize(JSON.parse(json).fetch('status'))
+json = JSON.generate(status: Status::RUNNING.serialize) # => '{"status":"RUNNING"}'
+Status.deserialize(JSON.parse(json).fetch('status')) # => Status::RUNNING
 ```
 
 ## Typing

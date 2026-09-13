@@ -3,10 +3,10 @@
 --cache-dir=tmp/sorbet_cache
 --enable-experimental-rbs-comments
 --parser=prism
---ignore=/.ruby-lsp
---ignore=/pkg
+--ignore=.ruby-lsp/
+--ignore=pkg/
 --ignore=/prism.rbi
---ignore=/tmp
---ignore=/vendor
+--ignore=tmp/
+--ignore=vendor/
 # This fixture intentionally contains errors verified by the CI type-check task.
 --ignore=/test/types/invalid.rb

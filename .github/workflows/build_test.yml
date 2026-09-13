@@ -1,0 +1,73 @@
+name: "💎 Build & Test"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build_test:
+    name: "Build & Checks / ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        # Draft pull requests run on Ubuntu to shorten the feedback cycle.
+        os: ${{ fromJSON(github.event.pull_request.draft && '["ubuntu-latest"]' || '["ubuntu-latest", "macos-latest"]') }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: Check dependencies
+        run: bundle check
+      - name: Lint
+        run: bundle exec rubocop
+      - name: Type-check
+        run: bundle exec rake typecheck
+      - name: Test
+        run: bundle exec rake test
+      - name: Build and verify package
+        run: bundle exec rake test:package
+
+  publish:
+    name: Publish
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build_test
+    runs-on: ubuntu-latest
+    permissions:
+      # Trusted publishing exchanges the GitHub identity for RubyGems credentials.
+      id-token: write
+      # The release task pushes a version tag.
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: Check published version
+        id: version
+        shell: bash
+        run: |
+          version=$(bundle exec ruby -r ./lib/enummify/version -e 'puts Enummify::VERSION')
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            "https://rubygems.org/api/v2/rubygems/enummify/versions/${version}.json")
+
+          case "$status" in
+            200) echo "publish=false" >> "$GITHUB_OUTPUT" ;;
+            404) echo "publish=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "RubyGems version lookup failed with HTTP ${status}" >&2; exit 1 ;;
+          esac
+      - name: Publish
+        if: steps.version.outputs.publish == 'true'
+        uses: rubygems/release-gem@v1.2.0

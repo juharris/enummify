@@ -1,0 +1,37 @@
+# typed: strict
+# frozen_string_literal: true
+
+require 'open3'
+
+binary = File.join(Gem::Specification.find_by_name('sorbet-static').full_gem_path, 'libexec', 'sorbet')
+command = [binary, '--no-error-count', '--no-error-sections', '--color=never']
+
+unless ARGV.empty?
+  command.concat(['--no-config'] + ARGV)
+  output, status = Open3.capture2e(*command)
+  abort "Exported RBI failed standard Sorbet checking:\n#{output}" unless status.success?
+
+  # Consumer checks must not resolve types from the checkout's implementation.
+  command.concat(%w[--parser=prism --enable-experimental-rbs-comments])
+  command << File.expand_path('enums.rb', __dir__)
+
+  output, status = Open3.capture2e(*command)
+  abort output unless status.success?
+end
+
+fixture = File.expand_path('invalid.rb', __dir__)
+expected = File.readlines(fixture).each_with_index.filter_map do |line, index|
+  match = line.match(/^\s*# expect-type-error: (\d+)/)
+  [fixture, index + 2, match[1]] if match
+end
+
+output, status = Open3.capture2e(*command, fixture)
+actual = output.scan(%r{^(.+\.rb):(\d+): .*https://srb\.help/(\d+)})
+actual.map! { |file, line, code| [file, line.to_i, code] }
+
+unless status.exitstatus == 100 && actual.sort == expected.sort
+  warn output
+  abort "Unexpected Sorbet diagnostics (exit #{status.exitstatus}).\nExpected: #{expected.inspect}\nActual: #{actual.inspect}"
+end
+
+puts "Sorbet: all #{expected.length} invalid calls rejected."

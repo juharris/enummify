@@ -1,5 +1,7 @@
 # Enummify
 
+[![Gem Version](https://badge.fury.io/rb/enummify.svg?icon=si%3Arubygems&icon_color=%23ec3c3c)](https://rubygems.org/gems/enummify)
+
 Create immutable, [RBS comment](https://sorbet.org/docs/rbs-support)-friendly, typed Ruby enums without a direct dependency on Sorbet.
 Enummify has no runtime dependencies and does not use Sorbet's `T::Enum`.
 Enummify provides minimal safeguards and expects enums to be used as documented in order to keep the library simple and efficient.

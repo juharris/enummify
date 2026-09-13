@@ -2,8 +2,7 @@
 
 Create immutable, [RBS comment](https://sorbet.org/docs/rbs-support)-friendly, typed Ruby enums without a direct dependency on Sorbet.
 Enummify has no runtime dependencies and does not use Sorbet's `T::Enum`.
-Enummify provides minimal safeguards and expects enums to be used as documented.
-Requires Ruby 3.2 or newer.
+Enummify provides minimal safeguards and expects enums to be used as documented in order to keep the library simple and efficient.
 
 ## Usage
 
@@ -54,9 +53,6 @@ Status.deserialize(JSON.parse(json).fetch('status')) # => Status::RUNNING
 ## Typing
 
 Types are declared as RBS method and constant comments in the Ruby sources.
-Inherited `.deserialize` and `.values` return the concrete enum type through RBS's `instance` type.
-A method annotated `#: (Status) -> String` can therefore require `Status` and reject a plain string or an unrelated enum.
-
 Sorbet is a development dependency only; the runtime does not load `sorbet-runtime` or use `T` APIs.
 The gem ships standard Sorbet signatures in `rbi/enummify.rbi` describing its public API.
 [Tapioca imports this interface](https://github.com/Shopify/tapioca#importing-hand-written-signatures-from-gems-rbi-folder) during the application's normal gem RBI setup.

@@ -16,16 +16,12 @@ bundle install
 
 ## Making changes
 
-The implementation lives in `lib/` and has no runtime dependencies.
-Keep runtime type annotations in RBS comments without introducing `T` APIs or `sorbet-runtime` into the implementation.
 Keep `# typed: strict` at the top of Ruby and RBI files, including tests.
 
 When changing the public API, update both the source annotations and [rbi/enummify.rbi](rbi/enummify.rbi).
 Use standard Sorbet `sig` declarations in the exported RBI so it works without experimental RBS support.
 The exported RBI lets applications type-check the gem without including its implementation files.
 
-Member registration happens eagerly through `const_added`.
-Lookup and enumeration only read the registry.
 Preserve the behavior documented in the README.
 
 ## Testing
@@ -49,15 +45,6 @@ bundle exec rake test
 bundle exec rubocop --cache true
 bundle exec srb tc
 ```
-
-Type checks cover the library and runtime tests, along with valid usage and intentional errors such as passing another enum, a raw string, or a possibly missing member.
-They also reject unknown member constants and invalid constructor arguments.
-`bundle exec rake typecheck` also verifies each marked invalid call in `test/types/`.
-In `test/types/invalid.rb`, place `# expect-type-error: CODE` immediately before the expression expected to fail.
-The checker compares the exact diagnostic codes and line numbers.
-
-The normal Sorbet configuration excludes the exported RBI so it cannot hide errors in the implementation.
-The package check validates the installed RBI without experimental flags, then verifies the RBS consumer fixtures against it separately.
 
 Apply style fixes:
 

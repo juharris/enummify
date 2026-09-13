@@ -7,9 +7,6 @@ module Enummify
     extend T::Sig
 
     sig { params(serialized: String).returns(T.attached_class) }
-    def self._load(serialized); end
-
-    sig { params(serialized: String).returns(T.attached_class) }
     def self.deserialize(serialized); end
 
     sig { params(serialized: String).returns(T.nilable(T.attached_class)) }

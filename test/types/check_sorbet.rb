@@ -14,10 +14,10 @@ unless ARGV.empty?
   # Consumer checks must not resolve types from the checkout's implementation.
   command.concat(%w[--parser=prism --enable-experimental-rbs-comments])
   command << File.expand_path('enums.rb', __dir__)
-end
 
-output, status = Open3.capture2e(*command)
-abort output unless status.success?
+  output, status = Open3.capture2e(*command)
+  abort output unless status.success?
+end
 
 fixture = File.expand_path('invalid.rb', __dir__)
 expected = File.readlines(fixture).each_with_index.filter_map do |line, index|
@@ -34,4 +34,4 @@ unless status.exitstatus == 100 && actual.sort == expected.sort
   abort "Unexpected Sorbet diagnostics (exit #{status.exitstatus}).\nExpected: #{expected.inspect}\nActual: #{actual.inspect}"
 end
 
-puts "Sorbet: valid usage passed; all #{expected.length} invalid calls rejected."
+puts "Sorbet: all #{expected.length} invalid calls rejected."

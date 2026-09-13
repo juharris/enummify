@@ -1,10 +1,11 @@
---parser=prism
+--dir
+.
+--cache-dir=tmp/sorbet_cache
 --enable-experimental-rbs-comments
---dir=.
+--parser=prism
 --ignore=/.ruby-lsp
 --ignore=/pkg
-# Check the shipped interface separately from its implementation.
---ignore=/rbi
+--ignore=/prism.rbi
 --ignore=/tmp
 --ignore=/vendor
 # This fixture intentionally contains errors verified by the CI type-check task.

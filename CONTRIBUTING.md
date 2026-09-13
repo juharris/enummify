@@ -47,16 +47,16 @@ bundle exec rake test
 
 ```shell
 bundle exec rubocop --cache true
-bundle exec rake typecheck
+bundle exec srb tc
 ```
 
 Type checks cover the library and runtime tests, along with valid usage and intentional errors such as passing another enum, a raw string, or a possibly missing member.
 They also reject unknown member constants and invalid constructor arguments.
-The Sorbet check verifies valid fixtures and each marked invalid call in `test/types/`.
+`bundle exec rake typecheck` also verifies each marked invalid call in `test/types/`.
 In `test/types/invalid.rb`, place `# expect-type-error: CODE` immediately before the expression expected to fail.
 The checker compares the exact diagnostic codes and line numbers.
 
-The normal Sorbet configuration excludes `rbi/` so the exported interface cannot hide errors in the implementation.
+The normal Sorbet configuration excludes the exported RBI so it cannot hide errors in the implementation.
 The package check validates the installed RBI without experimental flags, then verifies the RBS consumer fixtures against it separately.
 
 Apply style fixes:

@@ -18,6 +18,7 @@ end
 
 desc 'Check valid and invalid enum usage with Sorbet via RBS comments'
 task :typecheck do
+  sh 'bundle', 'exec', 'srb', 'tc'
   ruby 'test/types/check_sorbet.rb'
 end
 

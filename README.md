@@ -1,7 +1,8 @@
 # Enummify
 
-Create immutable, [RBS comment](https://sorbet.org/docs/rbs-support)-friendly typed Ruby enums without a direct dependency on Sorbet.
+Create immutable, [RBS comment](https://sorbet.org/docs/rbs-support)-friendly, typed Ruby enums without a direct dependency on Sorbet.
 Enummify has no runtime dependencies and does not use Sorbet's `T::Enum`.
+Enummify provides minimal safeguards and expects enums to be used as documented.
 Requires Ruby 3.2 or newer.
 
 ## Usage
@@ -35,7 +36,6 @@ Pass a string, such as `SUCCEEDED = new('Succeeded') #: Status`, to choose a cus
 Serialized values must be unique within the enum.
 Every constant defined directly on the class must be a member of that enum.
 Duplicate serialized values raise immediately.
-The `new` constructor is private.
 
 Each constant assignment immediately registers its member.
 

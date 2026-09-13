@@ -7,18 +7,18 @@ require_relative '../lib/enummify'
 # Named fixtures support static member types and Marshal class resolution.
 module EnumTest
   class DefaultStatus < Enummify::Enum
-    FromNil = new(nil) #: DefaultStatus
-    Pending = new #: DefaultStatus
+    FROM_NIL = new(nil) #: DefaultStatus
+    PENDING = new #: DefaultStatus
     RUNNING = new #: DefaultStatus
   end
 
   class OtherStatus < Enummify::Enum
-    Pending = new('pending') #: OtherStatus
+    PENDING = new('pending') #: OtherStatus
   end
 
   class Status < Enummify::Enum
-    Pending = new('pending') #: Status
-    Running = new('running') #: Status
+    PENDING = new('pending') #: Status
+    RUNNING = new('running') #: Status
   end
 
   class EnumTest < Test::Unit::TestCase
@@ -26,32 +26,18 @@ module EnumTest
     def test_aliases_are_rejected
       enum = enum_with_value('value')
 
-      assert_raises(ArgumentError) { enum.const_set(:Alias, enum_member(enum, :Value)) }
-      assert_same(enum_member(enum, :Value), enum.deserialize('value'))
-    end
-
-    #: () -> void
-    def test_base_class_cannot_define_members
-      assert_raises(TypeError) do
-        Enummify::Enum.send(:new, 'invalid')
-      end
-      assert_equal('valid', enum_member(enum_with_value('valid'), :Value).serialize)
+      assert_raises(ArgumentError) { enum.const_set(:ALIAS, enum_member(enum, :VALUE)) }
+      assert_same(enum_member(enum, :VALUE), enum.deserialize('value'))
     end
 
     #: () -> void
     def test_case_matches_members
-      result = case Status::Running
-               when Status::Pending then :waiting
-               when Status::Running then :active
+      result = case Status::RUNNING
+               when Status::PENDING then :waiting
+               when Status::RUNNING then :active
                end
 
       assert_equal(:active, result)
-    end
-
-    #: () -> void
-    def test_construction_is_private
-      assert_raises(NoMethodError) { Status.public_send(:new, 'extra') }
-      assert_equal([Status::Pending, Status::Running], Status.values)
     end
 
     #: () -> void
@@ -68,19 +54,19 @@ module EnumTest
     def test_declarations_are_ready_before_first_read
       [nil, 'value'].each do |serialization|
         enum = enum_with_value(serialization)
-        expected = serialization || 'Value'
+        expected = serialization || 'VALUE'
 
-        assert_equal([enum_member(enum, :Value)], enum.values)
-        assert_same(enum_member(enum, :Value), enum.deserialize(expected))
-        assert_same(enum_member(enum, :Value), enum.try_deserialize(expected))
+        assert_equal([enum_member(enum, :VALUE)], enum.values)
+        assert_same(enum_member(enum, :VALUE), enum.deserialize(expected))
+        assert_same(enum_member(enum, :VALUE), enum.try_deserialize(expected))
       end
     end
 
     #: () -> void
     def test_default_serialization_preserves_constant_names
-      assert_equal('Pending', DefaultStatus::Pending.serialize)
+      assert_equal('PENDING', DefaultStatus::PENDING.serialize)
       assert_equal('RUNNING', DefaultStatus::RUNNING.serialize)
-      assert_equal('FromNil', DefaultStatus::FromNil.serialize)
+      assert_equal('FROM_NIL', DefaultStatus::FROM_NIL.serialize)
     end
 
     #: () -> void
@@ -101,11 +87,11 @@ module EnumTest
 
     #: () -> void
     def test_duplicate_serializations_are_rejected
-      [%w[duplicate duplicate], [nil, 'First'], ['Second', nil]].each do |first_serialization, second_serialization|
+      [%w[duplicate duplicate], [nil, 'FIRST'], ['SECOND', nil]].each do |first_serialization, second_serialization|
         enum = Class.new(Enummify::Enum)
-        first = declare_member(enum, :First, first_serialization)
+        first = declare_member(enum, :FIRST, first_serialization)
 
-        assert_raises(ArgumentError) { declare_member(enum, :Second, second_serialization) }
+        assert_raises(ArgumentError) { declare_member(enum, :SECOND, second_serialization) }
         assert_same(first, enum.deserialize(first.serialize))
       end
     end
@@ -122,12 +108,12 @@ module EnumTest
 
     #: () -> void
     def test_equality_is_scoped_to_the_enum_class
-      assert_not_equal(Status::Pending, OtherStatus::Pending)
-      assert_not_equal(Status::Pending, Status::Running)
-      assert_not_equal(Status::Pending, 'pending')
-      assert_equal(Status::Pending, Status.deserialize('pending'))
+      assert_not_equal(Status::PENDING, OtherStatus::PENDING)
+      assert_not_equal(Status::PENDING, Status::RUNNING)
+      assert_not_equal(Status::PENDING, 'pending')
+      assert_equal(Status::PENDING, Status.deserialize('pending'))
 
-      indexed = { Status::Pending => :status, OtherStatus::Pending => :other_status }
+      indexed = { Status::PENDING => :status, OtherStatus::PENDING => :other_status }
       assert_equal(2, indexed.size)
       assert_equal(:status, indexed[Status.deserialize('pending')])
       assert_equal(:other_status, indexed[OtherStatus.deserialize('pending')])
@@ -135,7 +121,7 @@ module EnumTest
 
     #: () -> void
     def test_inspection_includes_class_and_serialization
-      inspected = Status::Pending.inspect
+      inspected = Status::PENDING.inspect
 
       assert_include(inspected, Status.name)
       assert_include(inspected, 'pending')
@@ -168,14 +154,14 @@ module EnumTest
     def test_registries_are_independent
       enum = enum_with_value('first')
       other_enum = enum_with_value('first')
-      declare_member(enum, :Second)
+      declare_member(enum, :SECOND)
 
-      assert_equal([enum_member(enum, :Value), enum_member(enum, :Second)], enum.values)
-      assert_same(enum_member(enum, :Second), enum.deserialize('Second'))
-      assert_same(enum_member(enum, :Value), enum.try_deserialize('first'))
-      assert_equal([enum_member(other_enum, :Value)], other_enum.values)
-      assert_same(enum_member(other_enum, :Value), other_enum.deserialize('first'))
-      assert_nil(other_enum.try_deserialize('Second'))
+      assert_equal([enum_member(enum, :VALUE), enum_member(enum, :SECOND)], enum.values)
+      assert_same(enum_member(enum, :SECOND), enum.deserialize('SECOND'))
+      assert_same(enum_member(enum, :VALUE), enum.try_deserialize('first'))
+      assert_equal([enum_member(other_enum, :VALUE)], other_enum.values)
+      assert_same(enum_member(other_enum, :VALUE), other_enum.deserialize('first'))
+      assert_nil(other_enum.try_deserialize('SECOND'))
     end
 
     #: () -> void
@@ -184,17 +170,17 @@ module EnumTest
       enum = enum_with_value(source)
       source.replace('changed')
 
-      assert_equal('mutable', enum_member(enum, :Value).serialize)
-      assert_predicate(enum_member(enum, :Value).serialize, :frozen?)
-      assert_raises(FrozenError) { enum_member(enum, :Value).serialize.replace('changed') }
-      assert_same(enum_member(enum, :Value), enum.deserialize('mutable'))
+      assert_equal('mutable', enum_member(enum, :VALUE).serialize)
+      assert_predicate(enum_member(enum, :VALUE).serialize, :frozen?)
+      assert_raises(FrozenError) { enum_member(enum, :VALUE).serialize.replace('changed') }
+      assert_same(enum_member(enum, :VALUE), enum.deserialize('mutable'))
       assert_nil(enum.try_deserialize('changed'))
     end
 
     #: () -> void
     def test_serialization_preserves_explicit_string_values
       ['', 'UPPER_case', 'with spaces', "line\nbreak"].each do |serialization|
-        value = enum_member(enum_with_value(serialization), :Value)
+        value = enum_member(enum_with_value(serialization), :VALUE)
 
         assert_equal(serialization, value.serialize)
         assert_equal(serialization, value.to_s)
@@ -212,11 +198,11 @@ module EnumTest
     def test_values_is_memoized_in_definition_order
       enum = Class.new(Enummify::Enum) do
         new('discarded')
-        const_set(:Zulu, new('last'))
-        const_set(:Alpha, new('first'))
+        const_set(:ZULU, new('last'))
+        const_set(:ALPHA, new('first'))
       end
 
-      members = [enum_member(enum, :Zulu), enum_member(enum, :Alpha)]
+      members = [enum_member(enum, :ZULU), enum_member(enum, :ALPHA)]
       values = enum.values
       assert_equal(members, values)
 
@@ -228,7 +214,7 @@ module EnumTest
 
     #: (singleton(Enummify::Enum), Symbol, ?String?) -> Enummify::Enum
     def declare_member(enum, name, serialization = nil)
-      enum.const_set(name, enum.send(:new, serialization)) #: as Enummify::Enum
+      enum.const_set(name, enum.new(serialization)) #: as Enummify::Enum
     end
 
     #: (singleton(Enummify::Enum), Symbol) -> Enummify::Enum
@@ -239,7 +225,7 @@ module EnumTest
     #: (?String?) -> singleton(Enummify::Enum)
     def enum_with_value(serialization = nil)
       Class.new(Enummify::Enum) do
-        const_set(:Value, new(serialization))
+        const_set(:VALUE, new(serialization))
       end
     end
 

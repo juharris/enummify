@@ -4,25 +4,23 @@
 # Every call must remain a type error, even when the serialized strings coincide.
 consumer = TypeExamples::Consumer.new
 # expect-type-error: 7002
-consumer.serialize('Pending')
+consumer.serialize('PENDING')
 # expect-type-error: 7002
-consumer.serialize(TypeExamples::OtherStatus::Pending)
+consumer.serialize(TypeExamples::OtherStatus::PENDING)
 # expect-type-error: 7002
-consumer.serialize(TypeExamples::OtherStatus.deserialize('Pending'))
+consumer.serialize(TypeExamples::OtherStatus.deserialize('PENDING'))
 # expect-type-error: 7002
 consumer.serialize(TypeExamples::OtherStatus.values.fetch(0))
 # expect-type-error: 7002
-TypeExamples::Status.deserialize(:Pending)
+TypeExamples::Status.deserialize(:PENDING)
 # expect-type-error: 7002
-TypeExamples::Status.try_deserialize(:Pending)
+TypeExamples::Status.try_deserialize(:PENDING)
 # expect-type-error: 7002
-consumer.serialize(TypeExamples::Status.try_deserialize('Pending'))
+consumer.serialize(TypeExamples::Status.try_deserialize('PENDING'))
 # expect-type-error: 5002
-consumer.serialize(TypeExamples::Status::Running)
-# expect-type-error: 7031
-TypeExamples::Status.new
+consumer.serialize(TypeExamples::Status::UNKNOWN)
 
 class InvalidStatus < Enummify::Enum
   # expect-type-error: 7002
-  Pending = new(:pending) #: InvalidStatus
+  PENDING = new(:pending) #: InvalidStatus
 end

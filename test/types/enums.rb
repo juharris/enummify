@@ -5,13 +5,13 @@ require 'enummify'
 
 module TypeExamples
   class OtherStatus < Enummify::Enum
-    Pending = new #: OtherStatus
+    PENDING = new #: OtherStatus
   end
 
   class Status < Enummify::Enum
-    Pending = new #: Status
+    PENDING = new #: Status
     RUNNING = new #: Status
-    Succeeded = new('succeeded') #: Status
+    SUCCEEDED = new('succeeded') #: Status
   end
 
   # These signatures verify that inherited methods preserve the concrete enum type.
@@ -39,11 +39,11 @@ module TypeExamples
 end
 
 consumer = TypeExamples::Consumer.new
-consumer.serialize(TypeExamples::Status::Pending)
+consumer.serialize(TypeExamples::Status::PENDING)
 consumer.serialize(TypeExamples::Status::RUNNING)
-consumer.serialize(TypeExamples::Status::Succeeded)
-consumer.serialize(TypeExamples::Status::Pending.clone(freeze: false))
-consumer.serialize(TypeExamples::Status::Pending.dup)
+consumer.serialize(TypeExamples::Status::SUCCEEDED)
+consumer.serialize(TypeExamples::Status::PENDING.clone(freeze: false))
+consumer.serialize(TypeExamples::Status::PENDING.dup)
 consumer.serialize(TypeExamples::Status._load('RUNNING'))
 consumer.serialize(consumer.deserialize)
 consumer.values.each { |member| consumer.serialize(member) }

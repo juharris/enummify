@@ -12,16 +12,11 @@ module Enummify
     sig { params(serialized: String).returns(T.attached_class) }
     def self.deserialize(serialized); end
 
-    sig { params(serialized: T.nilable(String)).returns(T.attached_class) }
-    def self.new(serialized = nil); end
-
     sig { params(serialized: String).returns(T.nilable(T.attached_class)) }
     def self.try_deserialize(serialized); end
 
     sig { returns(T::Array[T.attached_class]) }
     def self.values; end
-
-    private_class_method :new
 
     sig { params(_depth: Integer).returns(String) }
     def _dump(_depth); end
@@ -40,5 +35,10 @@ module Enummify
 
     sig { returns(String) }
     def to_s; end
+
+    private
+
+    sig { params(serialized: T.nilable(String)).void }
+    def initialize(serialized = nil); end
   end
 end

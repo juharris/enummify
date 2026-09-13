@@ -52,14 +52,7 @@ module Enummify
       subclass.instance_variable_set(:@serialized_to_value, {})
     end
 
-    #: (?String?) -> instance
-    def self.new(serialized = nil)
-      raise TypeError, 'Enum members must belong to a concrete enum class' if equal?(Enum)
-
-      super(serialized)
-    end
-
-    private_class_method :const_added, :inherited, :new
+    private_class_method :const_added, :inherited
 
     # Store only the serialized string so Marshal loading uses the registered member.
     #: (Integer) -> String
@@ -105,8 +98,8 @@ module Enummify
       @serialized
     end
 
-    #: (String?) -> void
-    def initialize(serialized)
+    #: (?String?) -> void
+    def initialize(serialized = nil)
       @serialized = serialized&.dup&.freeze #: String?
     end
   end

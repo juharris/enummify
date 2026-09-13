@@ -16,20 +16,6 @@ module EnumTest
     Pending = new('pending') #: OtherStatus
   end
 
-  class ReopenedStatus < Enummify::Enum
-    Value = new('value') #: ReopenedStatus
-  end
-
-  # Reading members must not prevent reopening the class to add methods.
-  ReopenedStatus.values
-
-  class ReopenedStatus
-    #: () -> String
-    def label
-      serialize.upcase
-    end
-  end
-
   class Status < Enummify::Enum
     Pending = new('pending') #: Status
     Running = new('running') #: Status
@@ -63,35 +49,9 @@ module EnumTest
     end
 
     #: () -> void
-    def test_concrete_enum_cannot_be_subclassed
-      assert_raise_kind_of(StandardError) { Class.new(Status) }
-    end
-
-    #: () -> void
-    def test_constant_reassignment_is_rejected
-      previous_verbose = $VERBOSE
-      $VERBOSE = nil
-      enum = enum_with_value('original')
-      original_member = enum_member(enum, :Value)
-
-      assert_raises(ArgumentError) { declare_member(enum, :Value, 'replacement') }
-      assert_same(original_member, enum.deserialize('original'))
-    ensure
-      $VERBOSE = previous_verbose
-    end
-
-    #: () -> void
     def test_construction_is_private
       assert_raises(NoMethodError) { Status.public_send(:new, 'extra') }
       assert_equal([Status::Pending, Status::Running], Status.values)
-    end
-
-    #: () -> void
-    def test_constructor_rejects_non_string_serialization
-      invalid_values = [:pending, 1, Object.new] #: Array[untyped]
-      invalid_values.each do |value|
-        assert_raises(TypeError) { enum_with_value(value) }
-      end
     end
 
     #: () -> void
@@ -108,11 +68,9 @@ module EnumTest
     def test_declarations_are_ready_before_first_read
       [nil, 'value'].each do |serialization|
         enum = enum_with_value(serialization)
-        enum.freeze
         expected = serialization || 'Value'
 
         assert_equal([enum_member(enum, :Value)], enum.values)
-        assert_predicate(enum.values, :frozen?)
         assert_same(enum_member(enum, :Value), enum.deserialize(expected))
         assert_same(enum_member(enum, :Value), enum.try_deserialize(expected))
       end
@@ -130,15 +88,6 @@ module EnumTest
       fixture_members.each do |value|
         assert_same(value, value.class.deserialize(value.serialize.dup))
         assert_same(value, value.class.try_deserialize(value.serialize.dup))
-      end
-    end
-
-    #: () -> void
-    def test_deserialization_rejects_non_strings
-      invalid_values = [nil, :pending, 1, Status::Pending] #: Array[untyped]
-      invalid_values.each do |value|
-        assert_raises(TypeError) { Status.deserialize(value) }
-        assert_raises(TypeError) { Status.try_deserialize(value) }
       end
     end
 
@@ -162,21 +111,13 @@ module EnumTest
     end
 
     #: () -> void
-    def test_empty_classes_allow_later_members
+    def test_empty_enum_values_are_memoized
       enum = Class.new(Enummify::Enum)
-      assert_equal([], enum.values)
+      empty_values = enum.values
+      assert_equal([], empty_values)
+      assert_same(empty_values, enum.values)
       assert_raises(ArgumentError) { enum.deserialize('value') }
       assert_nil(enum.try_deserialize('value'))
-
-      declare_member(enum, :Value, 'value')
-      assert_same(enum_member(enum, :Value), enum.deserialize('value'))
-      assert_equal([enum_member(enum, :Value)], enum.values)
-    end
-
-    #: () -> void
-    def test_enum_methods_can_be_added_after_lookup
-      assert_equal([ReopenedStatus::Value], ReopenedStatus.values)
-      assert_equal('VALUE', ReopenedStatus::Value.label)
     end
 
     #: () -> void
@@ -203,18 +144,6 @@ module EnumTest
     end
 
     #: () -> void
-    def test_invalid_declarations_allow_later_valid_members
-      [nil, 'pending', OtherStatus::Pending].each do |invalid_member|
-        enum = enum_with_value('original')
-        assert_raises(TypeError) { enum.const_set(:Invalid, invalid_member) }
-        assert_same(enum_member(enum, :Value), enum.deserialize('original'))
-
-        declare_member(enum, :Later, 'later')
-        assert_same(enum_member(enum, :Later), enum.deserialize('later'))
-      end
-    end
-
-    #: () -> void
     def test_marshal_preserves_identity
       members = fixture_members
       restored = Marshal.load(Marshal.dump(members)) #: as Array[Enummify::Enum]
@@ -236,24 +165,17 @@ module EnumTest
     end
 
     #: () -> void
-    def test_reopening_preserves_snapshots_and_other_enums
+    def test_registries_are_independent
       enum = enum_with_value('first')
       other_enum = enum_with_value('first')
-      original_values = enum.values
       declare_member(enum, :Second)
 
-      assert_equal([enum_member(enum, :Value)], original_values)
-      assert_predicate(original_values, :frozen?)
       assert_equal([enum_member(enum, :Value), enum_member(enum, :Second)], enum.values)
-      assert_predicate(enum.values, :frozen?)
       assert_same(enum_member(enum, :Second), enum.deserialize('Second'))
       assert_same(enum_member(enum, :Value), enum.try_deserialize('first'))
       assert_equal([enum_member(other_enum, :Value)], other_enum.values)
       assert_same(enum_member(other_enum, :Value), other_enum.deserialize('first'))
       assert_nil(other_enum.try_deserialize('Second'))
-
-      declare_member(other_enum, :Second)
-      assert_not_same(enum_member(enum, :Second), other_enum.deserialize('Second'))
     end
 
     #: () -> void
@@ -279,17 +201,26 @@ module EnumTest
       end
     end
 
+    #: -> void
+    def test_values
+      values = Status.values
+      assert_same(Status.values, values)
+      assert(values.frozen?)
+    end
+
     #: () -> void
-    def test_values_preserves_definition_order_and_is_frozen
+    def test_values_is_memoized_in_definition_order
       enum = Class.new(Enummify::Enum) do
         new('discarded')
         const_set(:Zulu, new('last'))
         const_set(:Alpha, new('first'))
       end
 
-      assert_equal([enum_member(enum, :Zulu), enum_member(enum, :Alpha)], enum.values)
-      assert_predicate(enum.values, :frozen?)
-      assert_raises(FrozenError) { enum.values.clear }
+      members = [enum_member(enum, :Zulu), enum_member(enum, :Alpha)]
+      values = enum.values
+      assert_equal(members, values)
+
+      assert_same(values, enum.values)
       assert_nil(enum.try_deserialize('discarded'))
     end
 

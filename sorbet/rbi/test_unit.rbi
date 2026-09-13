@@ -5,6 +5,9 @@ module Test
   module Unit
     # test-unit does not ship signatures for the assertions used by this suite.
     module Assertions
+      #: (Object, ?String?) -> void
+      def assert(expression, message = nil); end
+
       #: (Object, Object, ?String?) -> void
       def assert_equal(expected, actual, message = nil); end
 

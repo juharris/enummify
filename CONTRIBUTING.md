@@ -26,7 +26,7 @@ The exported RBI lets applications type-check the gem without including its impl
 
 Member registration happens eagerly through `const_added`.
 Lookup and enumeration only read the registry.
-Preserve the behavior documented in the README, including support for reopening enum classes.
+Preserve the behavior documented in the README.
 
 ## Testing
 

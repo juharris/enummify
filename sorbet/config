@@ -8,5 +8,10 @@
 --ignore=/prism.rbi
 --ignore=tmp/
 --ignore=vendor/
+# The exported RBI redeclares the generic classes, and a type member cannot be declared twice,
+# so it is checked on its own by the package task rather than merged with the implementation here.
+# srb also injects this gem's own rbi directory, the way it does for prism above,
+# so the pattern is unanchored to match the file under both input paths.
+--ignore=enummify.rbi
 # This fixture intentionally contains errors verified by the CI type-check task.
 --ignore=/test/types/invalid.rb

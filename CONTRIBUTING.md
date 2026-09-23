@@ -4,7 +4,7 @@ For installation and usage, see [README.md](README.md).
 
 ## Setup
 
-Use Ruby 4.0.6, as pinned in `.ruby-version`, for local development.
+Use the Ruby version pinned in `.ruby-version`, for local development.
 Keep the runtime compatible with Ruby 3.2 and newer.
 Ruby 3.2 introduced `Module#const_added`, which the gem uses for eager member registration.
 
@@ -38,6 +38,29 @@ To run only the runtime tests:
 ```shell
 bundle exec rake test
 ```
+
+### Benchmarks
+
+The [Performance](README.md#performance) numbers in the README come from the scripts in [benchmark/](benchmark/).
+Re-run them after a change to `Enum`, `EnumSet` or `EnumHash`, and update the README from their output:
+
+```shell
+bundle exec rake benchmark
+```
+
+This runs every script under the interpreter and then under YJIT, because the two disagree on which operations win.
+A full run takes several minutes.
+To run one script in one mode:
+
+```shell
+bundle exec ruby benchmark/enum_set_benchmark.rb
+bundle exec ruby --yjit benchmark/enum_set_benchmark.rb
+```
+
+Each script prints Markdown tables comparing `Set` or `Hash` against its Enummify counterpart for enums of 8, 40, and 62 members.
+62 is the largest enum whose masks are immediate `Integer`s, and larger enums are not a performance target.
+Timings are the fastest of several rounds, with the cost of the timing loop itself subtracted.
+Numbers vary between machines, so compare runs from the same machine.
 
 ## Style and typing
 

@@ -21,15 +21,23 @@ Layout/LineLength:
 
 Metrics/AbcSize:
   Max: 22
+  Exclude:
+    # A benchmark's operations are lambdas that close over its fixtures, so they are declared in the method that
+    # builds those fixtures.
+    - 'benchmark/**/*'
 
 Metrics/ClassLength:
-  Max: 160
+  Max: 170
 
 Metrics/CyclomaticComplexity:
   Max: 12
 
 Metrics/MethodLength:
   Max: 24
+  Exclude:
+    # A benchmark's operations are lambdas that close over its fixtures, so they are declared in the method that
+    # builds those fixtures.
+    - 'benchmark/**/*'
 
 Metrics/PerceivedComplexity:
   Max: 10

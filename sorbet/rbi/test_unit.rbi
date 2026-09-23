@@ -8,11 +8,17 @@ module Test
       #: (Object, ?String?) -> void
       def assert(expression, message = nil); end
 
+      #: (Object, ?String?) -> void
+      def assert_false(expression, message = nil); end
+
       #: (Object, Object, ?String?) -> void
       def assert_equal(expected, actual, message = nil); end
 
       #: (Object, Object, ?String?) -> void
       def assert_include(collection, object, message = nil); end
+
+      #: (Module[top], Object, ?String?) -> void
+      def assert_instance_of(klass, object, message = nil); end
 
       #: (Object, ?String?) -> void
       def assert_nil(object, message = nil); end
@@ -22,6 +28,9 @@ module Test
 
       #: (Regexp | String, String, ?String?) -> void
       def assert_not_match(pattern, string, message = nil); end
+
+      #: (Object, Symbol | String, ?String?) -> void
+      def assert_not_predicate(object, predicate, message = nil); end
 
       #: (Object, Object, ?String?) -> void
       def assert_not_same(expected, actual, message = nil); end

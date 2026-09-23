@@ -196,6 +196,28 @@ module EnumTest
     end
 
     #: () -> void
+    def test_ordinals_are_dense_and_assigned_before_freezing
+      # EnumSet indexes a bitmask by ordinal and EnumHash indexes an array by it, so a gap, a repeat, or an order
+      # that does not match values would silently corrupt both.
+      enum = Class.new(Enummify::Enum) do
+        const_set(:ZULU, new)
+        const_set(:ALPHA, new)
+        const_set(:MIKE, new)
+      end
+
+      assert_equal([0, 1, 2], enum.values.map { |member| member.instance_variable_get(:@ordinal) })
+
+      # Registration freezes each member, so an ordinal that is present at all was written before the freeze.
+      enum.values.each { |member| assert_predicate(member, :frozen?) }
+
+      fixture_members.group_by(&:class).each_value do |members|
+        members.each_with_index do |member, index|
+          assert_equal(index, member.instance_variable_get(:@ordinal), member.inspect)
+        end
+      end
+    end
+
+    #: () -> void
     def test_registries_are_independent
       enum = enum_with_value('first')
       other_enum = enum_with_value('first')

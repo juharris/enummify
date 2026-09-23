@@ -3,7 +3,7 @@
 		"Enummify"
 	],
 	"rubyLsp.featureFlags": { "tapiocaAddon": true },
-	"rubyLsp.rubyVersionManager": { "identifier": "none" },
+	"rubyLsp.rubyVersionManager": { "identifier": "chruby" },
 	"search.exclude": {
 		"**/sorbet/rbi": true,
 		"pkg": true,

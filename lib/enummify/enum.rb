@@ -7,13 +7,15 @@ module Enummify
     @serialized_to_value = {} #: Hash[String, Enum]
     @values = nil #: Array[Enum]?
 
-    # Register direct constants so only named members belong to the enum.
+    # Register each constant as a member, which assumes every constant in the class body is one.
+    # Groupings such as sets belong outside the enum class.
     #: (Symbol) -> void
     def self.const_added(constant)
       super
 
-      member = const_get(constant, false) #: as Enum
-      serialized = member.send(:finalize, constant)
+      member = const_get(constant, false)
+      # The registry size is the member's declaration index, which EnumSet and EnumHash rely on.
+      serialized = member.send(:finalize, constant, @serialized_to_value.size) #: as String
       if @serialized_to_value.key?(serialized)
         raise ArgumentError, "Duplicate serialized value for #{name}: #{serialized.inspect} is already used"
       end
@@ -30,6 +32,17 @@ module Enummify
     class << self
       # Restore the canonical member when loading a Marshal stream.
       alias _load deserialize
+    end
+
+    # Build a set of this enum's members, backed by a bitmask.
+    # The attached class cannot appear in a parameter, so the member type is taken from the arguments instead.
+    # Mixing enums therefore yields a set of the wrong member type, which is rejected wherever that set is used.
+    # At least one member is required, because an empty set has nothing to take the member type from.
+    # Use EnumSet.none for that.
+    #: [M] (M & Enum, *(M & Enum)) -> EnumSet[M]
+    def self.set(member, *members)
+      # A set is unordered, so the first member goes on the end of the rest rather than paying to shift them along.
+      EnumSet.from(self, members.push(member)) #: as EnumSet[M]
     end
 
     # Look up a member, returning nil for an unknown string.
@@ -90,8 +103,12 @@ module Enummify
     private
 
     # The constant name is only available after construction has returned.
-    #: (Symbol) -> String
-    def finalize(constant)
+    # The ordinal must be assigned here rather than by the caller because this method freezes the member.
+    # Assigning conditionally leaves an already registered member untouched, so aliasing one reaches the duplicate
+    # check below rather than failing to write to a frozen member.
+    #: (Symbol, Integer) -> String
+    def finalize(constant, ordinal)
+      @ordinal ||= ordinal
       @serialized ||= constant.name
       freeze
       @serialized
@@ -99,6 +116,9 @@ module Enummify
 
     #: (?String?) -> void
     def initialize(serialized = nil)
+      # Declaration order, assigned during registration.
+      # EnumSet and EnumHash read this directly to index a bitmask and an array, so it stays out of the public API.
+      @ordinal = nil #: Integer?
       @serialized = serialized&.dup&.freeze #: String?
     end
   end

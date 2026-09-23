@@ -4,7 +4,7 @@ For installation and usage, see [README.md](README.md).
 
 ## Setup
 
-Use Ruby 4.0.6, as pinned in `.ruby-version`, for local development.
+Use the Ruby version pinned in `.ruby-version`, for local development.
 Keep the runtime compatible with Ruby 3.2 and newer.
 Ruby 3.2 introduced `Module#const_added`, which the gem uses for eager member registration.
 

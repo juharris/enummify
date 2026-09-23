@@ -39,6 +39,14 @@ To run only the runtime tests:
 bundle exec rake test
 ```
 
+### Benchmarks
+
+TODO: Commit the benchmark scripts behind the [Performance](README.md#performance) numbers in the README.
+They were run ad hoc, so those numbers cannot currently be reproduced or refreshed after a change to `EnumSet` or
+`EnumHash`.
+They should cover set algebra, iteration, keyed reads and writes, and container memory, comparing against `Set` and
+`Hash` across enums on both sides of the 62-bit immediate boundary.
+
 ## Style and typing
 
 ```shell

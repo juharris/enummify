@@ -160,6 +160,14 @@ module Enummify
       [@enum_class, @mask].hash
     end
 
+    # FIXME: This is 1.27x slower than Set#include?, measured over 2M calls against a 40 member enum.
+    # Reading the ordinal is the whole cost: the same test through a public attr_reader measured 0.120 against
+    # Set's 0.128, so it is instance_variable_get, not the bit test, that loses.
+    # A membership test is the most common operation on a set, so being slower than the class this replaces is not
+    # acceptable.
+    # Exposing the ordinal is the known fix, but it needs a decision because it widens the public API with an
+    # implementation detail.
+    #
     # Unlike add and delete, this overrides Enumerable#include?, which forbids narrowing the parameter beyond the
     # member type, so the ordinal is reached through a local rather than an intersection.
     # The local is a widening for the type checker; it still compiles to an inline read.

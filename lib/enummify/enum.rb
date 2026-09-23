@@ -72,6 +72,15 @@ module Enummify
       serialize
     end
 
+    # The member's bit in EnumSet and EnumHash masks, which is 1 shifted left by the ordinal.
+    # It is public only so those classes can read it without a slower private lookup, and is not meant for use
+    # outside Enummify.
+    # It is computed once because shifting at every use measured slower, both when building a mask and when testing
+    # one that is an immediate Integer.
+    # Like the ordinal, it changes when members are inserted or reordered.
+    #: Integer
+    attr_reader :bit
+
     # Enum members are immutable singletons, including copies requested as unfrozen.
     # rubocop:disable Lint/UnusedMethodArgument
     #: (?freeze: bool?) -> self
@@ -90,6 +99,13 @@ module Enummify
       "#<#{self.class.name}: #{serialize.inspect}>"
     end
 
+    # The member's 0-based position in declaration order, which EnumHash uses as its slot.
+    # It is public only so EnumSet and EnumHash can read it without a slower private lookup, and is not meant for use
+    # outside Enummify.
+    # It changes when members are inserted or reordered, so persist serialize rather than this.
+    #: Integer
+    attr_reader :ordinal
+
     #: () -> String
     def serialize
       @serialized || raise(ArgumentError, 'Enum members must be assigned to a constant before serialization')
@@ -103,12 +119,15 @@ module Enummify
     private
 
     # The constant name is only available after construction has returned.
-    # The ordinal must be assigned here rather than by the caller because this method freezes the member.
-    # Assigning conditionally leaves an already registered member untouched, so aliasing one reaches the duplicate
-    # check below rather than failing to write to a frozen member.
+    # The ordinal and bit must be assigned here rather than by the caller because this method freezes the member.
+    # Assigning conditionally leaves an already registered member untouched, so aliasing one reaches the caller's
+    # duplicate check rather than failing to write to a frozen member.
     #: (Symbol, Integer) -> String
     def finalize(constant, ordinal)
-      @ordinal ||= ordinal
+      unless frozen?
+        @ordinal = ordinal
+        @bit = 1 << ordinal
+      end
       @serialized ||= constant.name
       freeze
       @serialized
@@ -116,9 +135,11 @@ module Enummify
 
     #: (?String?) -> void
     def initialize(serialized = nil)
-      # Declaration order, assigned during registration.
-      # EnumSet and EnumHash read this directly to index a bitmask and an array, so it stays out of the public API.
-      @ordinal = nil #: Integer?
+      # Declaration order and its bit, assigned during registration.
+      # They start as Integers rather than nil so the readers need no check, because every EnumSet and EnumHash
+      # operation reads one of them.
+      @bit = 0 #: Integer
+      @ordinal = -1 #: Integer
       @serialized = serialized&.dup&.freeze #: String?
     end
   end

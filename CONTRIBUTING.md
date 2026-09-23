@@ -41,11 +41,26 @@ bundle exec rake test
 
 ### Benchmarks
 
-TODO: Commit the benchmark scripts behind the [Performance](README.md#performance) numbers in the README.
-They were run ad hoc, so those numbers cannot currently be reproduced or refreshed after a change to `EnumSet` or
-`EnumHash`.
-They should cover set algebra, iteration, keyed reads and writes, and container memory, comparing against `Set` and
-`Hash` across enums on both sides of the 62-bit immediate boundary.
+The [Performance](README.md#performance) numbers in the README come from the scripts in [benchmark/](benchmark/).
+Re-run them after a change to `Enum`, `EnumSet` or `EnumHash`, and update the README from their output:
+
+```shell
+bundle exec rake benchmark
+```
+
+This runs every script under the interpreter and then under YJIT, because the two disagree on which operations win.
+A full run takes several minutes.
+To run one script in one mode:
+
+```shell
+bundle exec ruby benchmark/enum_set_benchmark.rb
+bundle exec ruby --yjit benchmark/enum_set_benchmark.rb
+```
+
+Each script prints Markdown tables comparing `Set` or `Hash` against its Enummify counterpart for enums of 8, 40, and 62 members.
+62 is the largest enum whose masks are immediate `Integer`s, and larger enums are not a performance target.
+Timings are the fastest of several rounds, with the cost of the timing loop itself subtracted.
+Numbers vary between machines, so compare runs from the same machine.
 
 ## Style and typing
 

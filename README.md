@@ -92,6 +92,10 @@ Members are yielded in declaration order.
 `size` and `length` count bits and cache the result; `count` is `Enumerable`'s and walks the members, the same split
 that Ruby's own `Set` has.
 
+Freezing a set caches its members and its size first, so a frozen set reads them as quickly as one that is not frozen.
+A set frozen some other way, such as by `clone(freeze: true)` or `Marshal.load(data, freeze: true)`, still reads
+correctly, but it cannot cache what it had not cached before, so those reads walk its mask every time.
+
 ## Maps
 
 `Enummify::EnumHash` is a mutable map keyed by members of a single enum, stored as an array indexed by declaration
@@ -142,6 +146,14 @@ counts = Enummify::EnumHash.from(Status, empty)
 
 Entries are yielded in declaration order of their keys, not in insertion order.
 
+Freezing a map caches its keys and freezes its slots first, and so does `clone` of a frozen map or `clone(freeze: true)`.
+A map frozen by `Marshal.load(data, freeze: true)` still reads correctly, but it rebuilds its keys for every `keys`,
+`each` and `to_h`.
+A frozen map raises `FrozenError` from any call that would change it, before changing anything.
+A call that would change nothing, such as deleting an absent key or merging an empty `Hash`, returns without raising,
+whereas `Hash` raises.
+`dup`, `clone(freeze: false)` and `merge` return maps that are not frozen and that have their own slots.
+
 ## Scoped to one enum
 
 Two enums number their members independently, so a set or a map belongs to exactly one enum.
@@ -158,37 +170,69 @@ This is the same trade as the rest of the library: static checking instead of ru
 
 ## Performance
 
-Measured on Ruby 4.0.7, arm64-darwin25, against a 40-member enum.
-The bitmask wins decisively on whole-set algebra and on memory, and loses slightly on the operations that stdlib
-already does in C.
+These numbers come from `bundle exec rake benchmark` on Ruby 4.0.7 for arm64-darwin25, under both the interpreter and YJIT.
+They vary by machine, so see [Benchmarks](CONTRIBUTING.md#benchmarks) to re-run them and compare runs from the same machine.
+Each range spans enums of 8, 40 and 62 members.
+Enums of more than 62 members work, but their masks are Bignums, and they are not a performance target.
 
-| Operation | vs. stdlib |
-| --- | --- |
-| `union`, `intersection` | 4–5.5× faster |
-| chained `(a \| b) & c` | 5.7× faster |
-| `subset?` | 4.3× faster |
-| key-set intersection across two maps | 26× faster |
-| `each`, `map` over a set | about even |
-| `include?`, `size`, construction | 1.1–1.3× slower |
-| `EnumHash#[]` | 1.0–1.2× slower |
-| `EnumHash#[]=` | 1.5× slower |
-| `EnumHash#each` | 2.4× slower |
+`EnumSet` compared with `Set`:
 
-Memory is where the representation pays off consistently:
-
-| Container (40 members) | stdlib | Enummify |
+| Operation | Interpreter | YJIT |
 | --- | --- | --- |
-| set | `Set` 1232 B | `EnumSet` 80 B, or 440 B once iterated |
-| map | `Hash` 1744 B | `EnumHash` 720 B |
+| `\|`, `&`, `-` and chained `(a \| b) & c` | 1.4–8.7× faster | 2.5–17× faster |
+| `subset?` | 3.7–21× faster | 23–121× faster |
+| `include?` | 1.3–1.4× faster | 3.3–5.7× faster |
+| `size` | 1.4–1.9× slower | 1.06× slower to 1.14× faster |
+| `size` of a new union | 1.3–3.2× faster | 2.1–4.4× faster |
+| build from an `Array` | 1.15× slower to 1.25× faster | 2.5–4.9× faster |
+| `each`, `map` | 1.09× slower to 1.13× faster | 1.02–1.23× faster |
+| `each` of a new union | 1.6–1.7× slower | 1.06–1.26× faster |
+
+`EnumHash` compared with `Hash`:
+
+| Operation | Interpreter | YJIT |
+| --- | --- | --- |
+| `[]` | 1.07× slower to 1.02× faster | 2.9–3.9× faster |
+| `key?` | 1.2–1.3× faster | 3.8–5.0× faster |
+| `[]=` | 1.6× slower | 1.8–2.2× faster |
+| `fetch` | 1.7–1.8× slower | 2.3–2.8× faster |
+| `delete`, then store again | 2.1–2.3× slower | 1.4–1.7× faster |
+| `size` | 4.0× slower | 1.5–2.6× faster |
+| `size` after a store | 1.6–1.7× slower | 1.8–2.2× faster |
+| `each` | 2.0–2.2× slower | 1.8–2.1× faster |
+| `keys & keys` across two maps | 1.01× slower to 11× faster | 1.7–21× faster |
+| `merge` | 1.7–4.1× slower | 2.1× slower to 1.5× faster |
+| build by storing every member | 1.25–1.7× slower | 1.09–2.2× faster |
+
+Whole-set algebra is where the bitmask wins, and its lead generally grows with the member count, because `Set`'s cost grows with it and a mask's barely does.
+YJIT widens most leads and turns most of the interpreter's losses into wins.
+
+Memory, in bytes owned by each container, not counting the members and values it refers to:
+
+| Container | `Set` or `Hash`, 8 members | Enummify, 8 members | `Set` or `Hash`, 62 members | Enummify, 62 members |
+| --- | ---: | ---: | ---: | ---: |
+| empty set | 144 | 80 | 144 | 80 |
+| full set | 208 | 80 | 1232 | 80 |
+| full set, once iterated | 208 | 184 | 1232 | 616 |
+| empty map | 160 | 160 | 160 | 720 |
+| full map | 160 | 160 | 1744 | 720 |
+| full map, once its keys are read | 160 | 240 | 1744 | 800 |
 
 A mask of 62 bits or fewer is an immediate `Integer` costing nothing beyond the object that holds it, so a set that
 has not been iterated allocates no storage of its own.
-Beyond 62 members Ruby promotes the mask to a Bignum, which allocates; `EnumHash` writes in particular slow down
-there, because each write builds a new mask.
+An `EnumHash` allocates a slot for every member up front, so an empty or sparse map is larger than the `Hash` it replaces.
 
 A set materializes and caches its member `Array` the first time it is iterated, because walking a mask in Ruby is
 slower than iterating an `Array`.
+That first walk is what `each` of a new union measures.
 Set algebra never materializes, which is what keeps chained operations cheap.
+
+An `EnumHash` counts its keys as they are added and removed, so `size` reads a number rather than counting bits.
+Keeping that count costs about 5–7 ns for each added or removed key in the interpreter, and 1–2 ns under YJIT.
+Overwriting a present key changes neither the count nor the cached `keys`, so only adding or removing a key discards
+that set.
+`each` walks the cached key set in Ruby, which YJIT compiles but the interpreter runs slower than `Hash`'s C loop.
+`merge` copies the map and then copies the other map's present slots directly, so the copy dominates for small enums.
 
 ## Typing
 

@@ -32,6 +32,11 @@ module Enummify
     sig { params(_depth: Integer).returns(String) }
     def _dump(_depth); end
 
+    # The member's bit in EnumSet and EnumHash masks.
+    # It is public only so those classes can read it quickly, and is not meant for use outside Enummify.
+    sig { returns(Integer) }
+    def bit; end
+
     sig { params(freeze: T.nilable(T::Boolean)).returns(T.self_type) }
     def clone(freeze: true); end
 
@@ -40,6 +45,11 @@ module Enummify
 
     sig { returns(String) }
     def inspect; end
+
+    # The member's 0-based position in declaration order.
+    # It is public only so EnumSet and EnumHash can read it quickly, and is not meant for use outside Enummify.
+    sig { returns(Integer) }
+    def ordinal; end
 
     sig { returns(String) }
     def serialize; end

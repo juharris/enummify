@@ -46,6 +46,20 @@ module EnumHashTest
     end
 
     #: () -> void
+    def test_copies_get_their_own_slots
+      counts = counts_of([Status::PENDING, 1])
+
+      [counts.dup, counts.clone].each do |copy|
+        copy[Status::PENDING] = 2
+        copy[Status::FAILED] = 9
+        assert_equal(counts_of([Status::PENDING, 2], [Status::FAILED, 9]), copy)
+        # A copy that shared its slots would have changed the source's value as well as its own.
+        assert_equal(counts_of([Status::PENDING, 1]), counts)
+        assert_equal(1, counts[Status::PENDING])
+      end
+    end
+
+    #: () -> void
     def test_delete_returns_the_value_and_removes_the_key
       counts = counts_of([Status::PENDING, 1], [Status::RUNNING, 2])
 
@@ -120,6 +134,24 @@ module EnumHashTest
     end
 
     #: () -> void
+    def test_freeze_keeps_reads_and_rejects_writes
+      counts = pending_and_failed_counts
+
+      assert_same(counts, counts.freeze)
+      assert_frozen_pending_and_failed(counts)
+      # Freezing caches the keys first, so a frozen map keeps reading one set.
+      assert_same(counts.keys, counts.keys)
+
+      # merge builds a new map, so it works on a frozen map and returns one that can be written.
+      merged = counts.merge(counts_of([Status::RUNNING, 3]))
+      assert_not_predicate(merged, :frozen?)
+      merged[Status::SUCCEEDED] = 5
+      assert_equal(counts_of([Status::PENDING, 1], [Status::RUNNING, 3], [Status::SUCCEEDED, 5], [Status::FAILED, 9]),
+                   merged)
+      assert_frozen_pending_and_failed(counts)
+    end
+
+    #: () -> void
     def test_from_copies_an_existing_hash
       source = { Status::PENDING => 1, Status::FAILED => 9 } #: Hash[Status, Integer]
       counts = Enummify::EnumHash.from(Status, source)
@@ -132,6 +164,29 @@ module EnumHashTest
       # An inline annotation swallows the rest of the line, so the empty Hash is typed through a local.
       empty = {} #: Hash[Status, Integer]
       assert_predicate(Enummify::EnumHash.from(Status, empty), :empty?)
+    end
+
+    #: () -> void
+    def test_frozen_copies_keep_reads_and_reject_writes
+      frozen = pending_and_failed_counts.freeze
+
+      # Kernel#clone and Marshal.load freeze a copy without calling freeze, so each way of freezing is checked.
+      assert_frozen_pending_and_failed(frozen.clone)
+      assert_frozen_pending_and_failed(pending_and_failed_counts.clone(freeze: true))
+      dumped = Marshal.dump(pending_and_failed_counts)
+      # Sorbet's signature for Marshal.load predates its freeze keyword, so the call goes through Method#call.
+      loaded = Marshal.method(:load).call(dumped, freeze: true) #: as Enummify::EnumHash[Status, Integer]
+      assert_frozen_pending_and_failed(loaded)
+
+      # A copy that is not frozen can be written without changing its frozen source.
+      [frozen.dup, frozen.clone(freeze: false)].each do |copy|
+        assert_not_predicate(copy, :frozen?)
+        copy[Status::RUNNING] = 3
+        copy[Status::PENDING] = 2
+        assert_equal(counts_of([Status::PENDING, 2], [Status::RUNNING, 3], [Status::FAILED, 9]), copy)
+        assert_equal(3, copy.size)
+      end
+      assert_frozen_pending_and_failed(frozen)
     end
 
     #: () -> void
@@ -152,6 +207,9 @@ module EnumHashTest
       keys = counts.keys
       assert_equal(Enummify::EnumSet.of(Status, Status::PENDING), keys)
       # The set is cached, so repeated reads do not rebuild it.
+      assert_same(keys, counts.keys)
+      # Overwriting a present key leaves the key set alone, so the cached set survives the write.
+      counts[Status::PENDING] = 2
       assert_same(keys, counts.keys)
 
       counts[Status::FAILED] = 9
@@ -207,15 +265,29 @@ module EnumHashTest
       merged = counts.merge(other)
       # The argument wins on a shared key, matching Hash#merge.
       assert_equal(counts_of([Status::PENDING, 1], [Status::RUNNING, 20], [Status::FAILED, 9]), merged)
+      # Equality compares slots and keys but not the size, which merge counts separately.
+      assert_equal(3, merged.size)
       # merge leaves both operands alone.
       assert_equal(counts_of([Status::PENDING, 1], [Status::RUNNING, 2]), counts)
+      assert_equal(2, counts.size)
+      assert_equal(counts_of([Status::RUNNING, 20], [Status::FAILED, 9]), other)
+
+      # Overwriting only keys that are already present changes values but neither the keys nor the size.
+      overwritten = counts.merge(counts_of([Status::PENDING, 10]))
+      assert_equal(counts_of([Status::PENDING, 10], [Status::RUNNING, 2]), overwritten)
+      assert_equal(2, overwritten.size)
+
+      assert_equal(counts_of([Status::PENDING, 1], [Status::RUNNING, 2], [Status::SUCCEEDED, 5]),
+                   counts.merge({ Status::SUCCEEDED => 5 }))
 
       assert_same(counts, counts.merge!(other))
       assert_equal(merged, counts)
+      assert_equal(3, counts.size)
 
       assert_equal(counts_of([Status::PENDING, 1], [Status::RUNNING, 20], [Status::FAILED, 9],
                              [Status::SUCCEEDED, 5]),
                    counts.merge!({ Status::SUCCEEDED => 5 }))
+      assert_equal(4, counts.size)
     end
 
     #: () -> void
@@ -265,6 +337,11 @@ module EnumHashTest
         assert_equal(size - 1, counts.fetch(last), "last #{size}")
         assert_equal(size - 1, counts.delete(last), "delete #{size}")
         assert_equal(size - 1, counts.size, "size after delete #{size}")
+
+        empty = {} #: Hash[Enummify::Enum, Integer]
+        merged = Enummify::EnumHash.from(enum, empty).merge(counts)
+        assert_equal(counts, merged, "merge #{size}")
+        assert_equal(size - 1, merged.size, "size after merge #{size}")
       end
     end
 
@@ -286,6 +363,33 @@ module EnumHashTest
 
     private
 
+    # Check that a frozen map of PENDING to 1 and FAILED to 9 answers every read and rejects every write.
+    #: (Enummify::EnumHash[Status, Integer]) -> void
+    def assert_frozen_pending_and_failed(counts)
+      expected = { Status::PENDING => 1, Status::FAILED => 9 }
+      assert_predicate(counts, :frozen?)
+      assert_equal(expected, counts.to_h)
+      assert_equal(2, counts.size)
+      assert_equal(Enummify::EnumSet.of(Status, Status::PENDING, Status::FAILED), counts.keys)
+      assert_equal([1, 9], counts.values)
+      assert_equal(9, counts.fetch(Status::FAILED))
+      assert_equal('#<Enummify::EnumHash[EnumHashTest::Status]: ' \
+                   '{#<EnumHashTest::Status: "pending"> => 1, #<EnumHashTest::Status: "failed"> => 9}>',
+                   counts.inspect)
+
+      # Each write raises before it changes anything, whether its key is present or absent.
+      assert_raises(FrozenError) { counts[Status::PENDING] = 2 }
+      assert_raises(FrozenError) { counts[Status::RUNNING] = 3 }
+      assert_raises(FrozenError) { counts.delete(Status::FAILED) }
+      assert_raises(FrozenError) { counts.clear }
+      assert_raises(FrozenError) { counts.merge!(counts_of([Status::RUNNING, 3])) }
+      assert_raises(FrozenError) { counts.merge!({ Status::RUNNING => 3 }) }
+      assert_equal(expected, counts.to_h)
+      assert_equal(2, counts.size)
+      assert_nil(counts[Status::RUNNING])
+      assert_false(counts.key?(Status::RUNNING))
+    end
+
     # Build a map of Status to Integer, which most tests need and which spells out the type once.
     #: (*[Status, Integer]) -> Enummify::EnumHash[Status, Integer]
     def counts_of(*entries)
@@ -299,6 +403,13 @@ module EnumHashTest
       Class.new(Enummify::Enum) do
         size.times { |index| const_set(:"MEMBER_#{index}", new) }
       end
+    end
+
+    # Build a map of PENDING to 1 and FAILED to 9 that is not frozen yet.
+    # Each check that freezes a map in a different way starts from a new one, so none of them sees another's freeze.
+    #: () -> Enummify::EnumHash[Status, Integer]
+    def pending_and_failed_counts
+      counts_of([Status::FAILED, 9], [Status::PENDING, 1])
     end
   end
 end

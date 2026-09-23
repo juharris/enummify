@@ -15,6 +15,7 @@ module Enummify
   # Sets are immutable: every operation returns a new set.
   # They are not frozen, because the member array and size are computed on first use and cached.
   # Materializing eagerly instead would cost far more than the bitmask saves.
+  # Freezing a set caches both first, so a frozen set reads them as quickly as one that is not frozen.
   #
   # The type parameter is named Elem so that including Enumerable supplies map, select and friends with the member
   # type already bound.
@@ -60,9 +61,7 @@ module Enummify
     def self.mask_for(members)
       mask = 0
       members.each do |member|
-        # Reading the ordinal inline is deliberate.
-        # Moving this read into a helper method measured slower than a plain Hash lookup, erasing the gain entirely.
-        mask |= 1 << member.instance_variable_get(:@ordinal)
+        mask |= member.bit
       end
       mask
     end
@@ -117,15 +116,13 @@ module Enummify
     # Return a set that also contains the member.
     #: (Elem & Enummify::Enum) -> EnumSet[Elem]
     def add(member)
-      # Reading the ordinal inline is deliberate.
-      # Moving this read into a helper method measured slower than a plain Hash lookup, erasing the gain entirely.
-      derive(@mask | (1 << member.instance_variable_get(:@ordinal)))
+      derive(@mask | member.bit)
     end
 
     # Return a set without the member.
     #: (Elem & Enummify::Enum) -> EnumSet[Elem]
     def delete(member)
-      derive(@mask & ~(1 << member.instance_variable_get(:@ordinal)))
+      derive(@mask & ~member.bit)
     end
 
     #: (EnumSet[Elem]) -> EnumSet[Elem]
@@ -155,27 +152,29 @@ module Enummify
       self == other
     end
 
+    # Freeze the set, first caching its members and size.
+    #: () -> self
+    def freeze
+      members
+      size
+      super
+    end
+
     #: () -> Integer
     def hash
       [@enum_class, @mask].hash
     end
 
-    # FIXME: This is 1.27x slower than Set#include?, measured over 2M calls against a 40 member enum.
-    # Reading the ordinal is the whole cost: the same test through a public attr_reader measured 0.120 against
-    # Set's 0.128, so it is instance_variable_get, not the bit test, that loses.
-    # A membership test is the most common operation on a set, so being slower than the class this replaces is not
-    # acceptable.
-    # Exposing the ordinal is the known fix, but it needs a decision because it widens the public API with an
-    # implementation detail.
-    #
-    # Unlike add and delete, this overrides Enumerable#include?, which forbids narrowing the parameter beyond the
-    # member type, so the ordinal is reached through a local rather than an intersection.
-    # The local is a widening for the type checker; it still compiles to an inline read.
-    # @override
-    #: (Elem) -> bool
+    # Masking by the member's bit measured faster than Set#include? for every enum of 62 or fewer members, whose masks
+    # are immediate Integers, and indexing the mask by ordinal did not in the interpreter.
+    # Enumerable#include? takes any member type, so narrowing the parameter is declared incompatible rather than cast
+    # inside, because the local that a cast needs measured 7 ns slower in the interpreter.
+    # Enums of more than 62 members are not a performance target, so masking is kept even though masking their Bignum
+    # masks allocates, which indexing by ordinal would not.
+    # @override(allow_incompatible: true)
+    #: (Elem & Enummify::Enum) -> bool
     def include?(member)
-      key = member #: untyped
-      @mask[key.instance_variable_get(:@ordinal)] == 1
+      @mask & member.bit != 0
     end
 
     #: () -> String
@@ -195,8 +194,7 @@ module Enummify
 
     #: () -> Integer
     def size
-      # Ruby has no popcount. Counting "1" in the binary representation measured fastest for small and large masks.
-      @size ||= @mask.to_s(2).count('1')
+      @size || count_members
     end
 
     #: (EnumSet[Elem]) -> bool
@@ -241,6 +239,18 @@ module Enummify
 
     private
 
+    # Count the members and cache the count.
+    # Ruby has no popcount. Counting "1" in the binary representation measured fastest for small and large masks.
+    #: () -> Integer
+    def count_members
+      counted = @mask.to_s(2).count('1')
+      # Kernel#clone and Marshal.load with freeze: true freeze a set without calling freeze, so such a set counts every
+      # time.
+      return counted if frozen?
+
+      @size = counted
+    end
+
     # Build a sibling set over the same enum.
     #: (Integer) -> EnumSet[Elem]
     def derive(mask)
@@ -271,7 +281,12 @@ module Enummify
         materialized << values[lowest.bit_length - 1]
         remaining ^= lowest
       end
-      @members = materialized.freeze
+      materialized.freeze
+      # Kernel#clone and Marshal.load with freeze: true freeze a set without calling freeze, so such a set materializes
+      # every time.
+      return materialized if frozen?
+
+      @members = materialized
     end
   end
 end

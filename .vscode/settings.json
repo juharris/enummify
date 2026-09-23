@@ -1,6 +1,9 @@
 {
 	"cSpell.words": [
-		"Enummify"
+		"Bignum",
+		"Enummify",
+		"stdlib",
+		"YJIT"
 	],
 	"rubyLsp.featureFlags": { "tapiocaAddon": true },
 	"rubyLsp.rubyVersionManager": { "identifier": "chruby" },

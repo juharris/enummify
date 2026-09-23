@@ -144,6 +144,22 @@ module EnumSetTest
     end
 
     #: () -> void
+    def test_freeze_caches_before_freezing
+      set = Enummify::EnumSet.of(Status, Status::FAILED, Status::PENDING)
+
+      assert_same(set, set.freeze)
+      assert_frozen_pending_and_failed(set)
+      # Freezing caches the members first, so a frozen set keeps reading one array.
+      assert_same(set.to_a, set.to_a)
+
+      # Set operations build new sets, so they work on a frozen set and return sets that are not frozen.
+      union = set | Enummify::EnumSet.of(Status, Status::RUNNING)
+      assert_not_predicate(union, :frozen?)
+      assert_equal([Status::PENDING, Status::RUNNING, Status::FAILED], union.to_a)
+      assert_equal(3, union.size)
+    end
+
+    #: () -> void
     def test_from_accepts_any_enumerable
       expected = Enummify::EnumSet.of(Status, Status::PENDING, Status::FAILED)
 
@@ -153,6 +169,17 @@ module EnumSetTest
                    Enummify::EnumSet.from(Status, [Status::PENDING, Status::FAILED, Status::PENDING]))
       assert_equal(expected, Enummify::EnumSet.from(Status, expected))
       assert_equal(Enummify::EnumSet.none(Status), Enummify::EnumSet.from(Status, []))
+    end
+
+    #: () -> void
+    def test_frozen_copies_read_their_members
+      # Kernel#clone and Marshal.load freeze a copy without calling freeze, so each way of freezing is checked.
+      assert_frozen_pending_and_failed(Enummify::EnumSet.of(Status, Status::FAILED, Status::PENDING).freeze.clone)
+      assert_frozen_pending_and_failed(Enummify::EnumSet.of(Status, Status::FAILED, Status::PENDING).clone(freeze: true))
+      dumped = Marshal.dump(Enummify::EnumSet.of(Status, Status::FAILED, Status::PENDING))
+      # Sorbet's signature for Marshal.load predates its freeze keyword, so the call goes through Method#call.
+      loaded = Marshal.method(:load).call(dumped, freeze: true) #: as Enummify::EnumSet[Status]
+      assert_frozen_pending_and_failed(loaded)
     end
 
     #: () -> void
@@ -281,6 +308,20 @@ module EnumSetTest
     end
 
     private
+
+    # Check that a frozen set of PENDING and FAILED answers every read, twice, so a second read cannot fail to cache.
+    #: (Enummify::EnumSet[Status]) -> void
+    def assert_frozen_pending_and_failed(set)
+      assert_predicate(set, :frozen?)
+      2.times do
+        assert_equal(2, set.size)
+        assert_equal([Status::PENDING, Status::FAILED], set.to_a)
+        assert_equal(%w[pending failed], set.map(&:serialize))
+        assert_equal('#<Enummify::EnumSet[EnumSetTest::Status]: ["pending", "failed"]>', set.inspect)
+      end
+      assert(set.include?(Status::FAILED))
+      assert_false(set.include?(Status::RUNNING))
+    end
 
     # Build an enum with the given number of members, for sizes that are impractical to write out.
     #: (Integer) -> singleton(Enummify::Enum)

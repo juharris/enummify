@@ -195,6 +195,16 @@ module Enummify
       derive(@mask & other.mask)
     end
 
+    # Mapping the cached members directly measured faster than Enumerable#map, which yields every member through each.
+    # Called without a block, Array#map returns an Enumerator just as Enumerable#map does.
+    # Sorbet allows overloads only in RBI files, so the blockless form is typed by Enumerable#map in the exported RBI.
+    # @override
+    #: [U] () { (Elem) -> U } -> Array[U]
+    def map(&)
+      cached = @members || members #: as Array[Elem]
+      cached.map(&)
+    end
+
     #: () -> Integer
     def size
       @size || count_members
@@ -227,6 +237,7 @@ module Enummify
       derive(@mask | other.mask)
     end
 
+    alias collect map
     alias complement ~
     alias length size
     alias member? include?

@@ -26,9 +26,9 @@ module Enummify
     # Sorbet cannot solve a type parameter out of a Hash literal, so a literal written at the call site yields an
     # untyped map and its keys go unchecked.
     # EnumHash.of infers from a literal, so prefer it unless the Hash is already typed.
-    #: [M < Enummify::Enum, V] (Class[M] & singleton(Enummify::Enum), Hash[M, V]) -> EnumHash[M, V]
+    #: [K < Enummify::Enum, V] (Class[K] & singleton(Enummify::Enum), Hash[K, V]) -> EnumHash[K, V]
     def self.from(enum_class, entries)
-      result = new(enum_class) #: EnumHash[M, V]
+      result = new(enum_class) #: EnumHash[K, V]
       result.merge!(entries)
       result
     end

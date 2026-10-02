@@ -185,7 +185,8 @@ Enums of more than 62 members work, but their masks are Bignums, and they are no
 | `size` | 1.3–1.4× slower | 1.08–1.23× faster |
 | `size` of a new union | 1.6–3.7× faster | 3.6–6.1× faster |
 | build from an `Array` | 1.10–1.4× faster | 4.2–5.9× faster |
-| `each`, `map` | 1.03× slower to 1.14× faster | 1.08–1.21× faster |
+| `each` | 1.00–1.14× faster | 1.12–1.17× faster |
+| `map` | 1.6× faster | 1.5–1.8× faster |
 | `each` of a new union | 1.5–1.7× slower | 1.22–1.4× faster |
 
 `EnumHash` compared with `Hash`:

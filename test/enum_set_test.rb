@@ -196,6 +196,19 @@ module EnumSetTest
     end
 
     #: () -> void
+    def test_map_matches_enumerable_map
+      set = Enummify::EnumSet.of(Status, Status::SUCCEEDED, Status::PENDING)
+
+      # The first call materializes the members and the second reads the cache.
+      2.times { assert_equal(%w[pending succeeded], set.map(&:serialize)) }
+      assert_equal(%w[pending succeeded], set.collect(&:serialize))
+      # Sorbet allows overloads only in RBI files, so the blockless form is called dynamically here.
+      enumerator = set.public_send(:map)
+      assert_instance_of(Enumerator, enumerator)
+      assert_equal(%w[0:pending 1:succeeded], enumerator.with_index { |member, index| "#{index}:#{member.serialize}" })
+    end
+
+    #: () -> void
     def test_membership_tests_every_member
       in_flight = Enummify::EnumSet.of(Status, Status::PENDING, Status::RUNNING)
 

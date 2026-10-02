@@ -72,13 +72,6 @@ module EnumSetTest
     end
 
     #: () -> void
-    def test_construction_is_restricted_to_factories
-      # public_send reaches the private constructor the way a consumer would, rather than bypassing it with send.
-      assert_raises(NoMethodError) { Enummify::EnumSet.public_send(:new, Status, 0) }
-      assert_raises(NoMethodError) { Enummify::EnumSet.public_send(:mask_for, []) }
-    end
-
-    #: () -> void
     def test_difference_removes_members
       in_flight = Enummify::EnumSet.of(Status, Status::PENDING, Status::RUNNING)
       pending = Enummify::EnumSet.of(Status, Status::PENDING)

@@ -64,6 +64,8 @@ module Enummify
   end
 
   # A mutable map keyed by members of a single enum, stored as an array indexed by declaration order.
+  # new is public at runtime only for speed, and initialize is deliberately not declared here, so Sorbet rejects a
+  # call to new with arguments.
   class EnumHash
     extend T::Generic
     extend T::Sig
@@ -156,6 +158,8 @@ module Enummify
   end
 
   # An immutable set of members of a single enum, stored as one Integer bitmask.
+  # new is public at runtime only for speed, and initialize is deliberately not declared here, so Sorbet rejects a
+  # call to new with arguments.
   class EnumSet
     extend T::Generic
     extend T::Sig

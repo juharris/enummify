@@ -179,30 +179,30 @@ Enums of more than 62 members work, but their masks are Bignums, and they are no
 
 | Operation | Interpreter | YJIT |
 | --- | --- | --- |
-| `\|`, `&`, `-` and chained `(a \| b) & c` | 1.4–8.7× faster | 2.5–17× faster |
-| `subset?` | 3.7–21× faster | 23–121× faster |
-| `include?` | 1.3–1.4× faster | 3.3–5.7× faster |
-| `size` | 1.4–1.9× slower | 1.06× slower to 1.14× faster |
-| `size` of a new union | 1.3–3.2× faster | 2.1–4.4× faster |
-| build from an `Array` | 1.15× slower to 1.25× faster | 2.5–4.9× faster |
-| `each`, `map` | 1.09× slower to 1.13× faster | 1.02–1.23× faster |
-| `each` of a new union | 1.6–1.7× slower | 1.06–1.26× faster |
+| `\|`, `&`, `-` and chained `(a \| b) & c` | 2.1–15× faster | 7.0–50× faster |
+| `subset?` | 3.9–22× faster | 21–115× faster |
+| `include?` | 1.25–1.5× faster | 3.4–5.5× faster |
+| `size` | 1.3–1.4× slower | 1.08–1.23× faster |
+| `size` of a new union | 1.6–3.7× faster | 3.6–6.1× faster |
+| build from an `Array` | 1.10–1.4× faster | 4.2–5.9× faster |
+| `each`, `map` | 1.03× slower to 1.14× faster | 1.08–1.21× faster |
+| `each` of a new union | 1.5–1.7× slower | 1.22–1.4× faster |
 
 `EnumHash` compared with `Hash`:
 
 | Operation | Interpreter | YJIT |
 | --- | --- | --- |
-| `[]` | 1.07× slower to 1.02× faster | 2.9–3.9× faster |
-| `key?` | 1.2–1.3× faster | 3.8–5.0× faster |
-| `[]=` | 1.6× slower | 1.8–2.2× faster |
-| `fetch` | 1.7–1.8× slower | 2.3–2.8× faster |
-| `delete`, then store again | 2.1–2.3× slower | 1.4–1.7× faster |
-| `size` | 4.0× slower | 1.5–2.6× faster |
+| `[]` | 1.07× slower to 1.02× faster | 2.9–4.0× faster |
+| `key?` | 1.25–1.3× faster | 3.7–4.8× faster |
+| `[]=` | 1.6–1.8× slower | 1.8–2.2× faster |
+| `fetch` | 1.7–1.8× slower | 2.3–2.7× faster |
+| `delete`, then store again | 2.0–2.2× slower | 1.4–1.6× faster |
+| `size` | 2.9–3.5× slower | 2.2–2.3× faster |
 | `size` after a store | 1.6–1.7× slower | 1.8–2.2× faster |
-| `each` | 2.0–2.2× slower | 1.8–2.1× faster |
-| `keys & keys` across two maps | 1.01× slower to 11× faster | 1.7–21× faster |
-| `merge` | 1.7–4.1× slower | 2.1× slower to 1.5× faster |
-| build by storing every member | 1.25–1.7× slower | 1.09–2.2× faster |
+| `each` | 2.0–2.1× slower | 1.8–2.1× faster |
+| `keys & keys` across two maps | 1.4–15× faster | 4.6–52× faster |
+| `merge` | 1.7–3.4× slower | 1.4× slower to 1.8× faster |
+| build by storing every member | 1.25–1.7× slower | 1.29–2.3× faster |
 
 Whole-set algebra is where the bitmask wins, and its lead generally grows with the member count, because `Set`'s cost grows with it and a mask's barely does.
 YJIT widens most leads and turns most of the interpreter's losses into wins.

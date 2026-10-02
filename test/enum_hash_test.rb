@@ -40,12 +40,6 @@ module EnumHashTest
     end
 
     #: () -> void
-    def test_construction_is_restricted_to_factories
-      # public_send reaches the private constructor the way a consumer would, rather than bypassing it with send.
-      assert_raises(NoMethodError) { Enummify::EnumHash.public_send(:new, Status) }
-    end
-
-    #: () -> void
     def test_copies_get_their_own_slots
       counts = counts_of([Status::PENDING, 1])
 

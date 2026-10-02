@@ -66,7 +66,7 @@ module Enummify
       mask
     end
 
-    private_class_method :mask_for, :new
+    private_class_method :mask_for
 
     #: (EnumSet[Elem]) -> EnumSet[Elem]
     def &(other)
@@ -135,10 +135,13 @@ module Enummify
       (@mask & other.mask).zero?
     end
 
+    # Reading the cached members directly rather than through to_a measured faster in the interpreter, because it
+    # skips two method calls.
     # @override
     #: () { (Elem) -> void } -> self
     def each(&)
-      to_a.each(&)
+      cached = @members || members #: as Array[Elem]
+      cached.each(&)
       self
     end
 
@@ -254,9 +257,15 @@ module Enummify
     # Build a sibling set over the same enum.
     #: (Integer) -> EnumSet[Elem]
     def derive(mask)
-      EnumSet.send(:new, @enum_class, mask) #: as EnumSet[Elem]
+      EnumSet.new(@enum_class, mask)
     end
 
+    # new is public only because hiding it with private_class_method adds a visibility override that Ruby 4.0's
+    # opt_new instruction does not recognize.
+    # Every new set then took the slow path, which measured about twice as slow in the interpreter and three times as
+    # slow under YJIT.
+    # It is not meant for use outside Enummify, and the exported RBI declares no initialize, so Sorbet rejects a
+    # consumer's call to new that passes it an enum and a mask.
     #: (singleton(Enummify::Enum), Integer) -> void
     def initialize(enum_class, mask)
       @enum_class = enum_class
@@ -268,6 +277,8 @@ module Enummify
     # Materialize the members once and cache them.
     # Walking the mask is slower than iterating an Array, so every iteration after the first reads the cache.
     # Extracting the lowest set bit costs one step per present member and yields declaration order.
+    # Negating as 0 - remaining and clearing by subtraction measured faster than -remaining and ^, because binary
+    # minus has a specialized instruction while unary minus and ^ are ordinary method calls.
     #: () -> Array[Enummify::Enum]
     def members
       cached = @members
@@ -277,9 +288,9 @@ module Enummify
       values = @enum_class.values
       remaining = @mask
       while remaining != 0
-        lowest = remaining & -remaining
+        lowest = remaining & (0 - remaining)
         materialized << values[lowest.bit_length - 1]
-        remaining ^= lowest
+        remaining -= lowest
       end
       materialized.freeze
       # Kernel#clone and Marshal.load with freeze: true freeze a set without calling freeze, so such a set materializes

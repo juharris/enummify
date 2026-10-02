@@ -41,8 +41,6 @@ module Enummify
       result
     end
 
-    private_class_method :new
-
     #: (Key & Enummify::Enum) -> Value?
     def [](member)
       @entries[member.ordinal]
@@ -89,8 +87,10 @@ module Enummify
 
       value = @entries[ordinal]
       @entries[ordinal] = nil
-      # The key is present, so toggling its bit clears it.
-      @present ^= member.bit
+      # The key is present, so subtracting its bit clears it.
+      # Subtracting measured faster than ^ in the interpreter, because subtraction has a specialized instruction and ^
+      # is an ordinary method call.
+      @present -= member.bit
       @size -= 1
       @keys = nil
       value
@@ -157,7 +157,7 @@ module Enummify
       cached = @keys
       return cached if cached
 
-      built = EnumSet.send(:new, @enum_class, @present) #: as EnumSet[Key & Enummify::Enum]
+      built = EnumSet.new(@enum_class, @present)
       # Marshal.load with freeze: true freezes a map without calling freeze, so such a map builds its keys every time.
       @keys = built unless frozen?
       built
@@ -229,6 +229,7 @@ module Enummify
 
     private
 
+    # new is public only for the reason given at EnumSet#initialize, and is not meant for use outside Enummify.
     # The capacity is read once, which is sound because members are declared in the class body and never added later.
     #: (singleton(Enummify::Enum)) -> void
     def initialize(enum_class)
@@ -255,26 +256,30 @@ module Enummify
 
     # Copy another map's present slots over this map's, then take the union of both key sets.
     # A while loop over the other map's cached key array measured faster than storing its entries one by one.
+    # Counting the added keys while copying replaced counting the bits of a newly built key set.
+    # It measured about a quarter faster for 8 members, and for larger enums a tenth faster under YJIT but up to 5%
+    # slower in the interpreter.
     # The slots are written first, so a frozen map raises from its frozen slots before its keys change.
     #: (EnumHash[Key, Value]) -> void
     def overlay(other)
       entries = @entries
       other_entries = other.entries
+      present = @present
+      size = @size
       members = other.keys.to_a
       index = 0
       while index < members.length
         member = members[index] #: as !nil
         ordinal = member.ordinal
         entries[ordinal] = other_entries[ordinal]
+        size += 1 unless present[ordinal] == 1
         index += 1
       end
-      present = @present | other.present
-      return if present == @present
+      return if size == @size
 
-      @present = present
+      @present = present | other.present
+      @size = size
       @keys = nil
-      # Counting through the new key set leaves it cached for the next keys or each.
-      @size = keys.size
     end
 
     # Cache the keys and freeze the slots, which a frozen map could no longer do.

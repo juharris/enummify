@@ -27,7 +27,7 @@ Metrics/AbcSize:
     - 'benchmark/**/*'
 
 Metrics/ClassLength:
-  Max: 170
+  Max: 180
 
 Metrics/CyclomaticComplexity:
   Max: 12

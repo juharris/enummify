@@ -60,6 +60,9 @@ counts.key?(TypeExamples::OtherStatus::PENDING)
 counts.delete(TypeExamples::OtherStatus::PENDING)
 # expect-type-error: 7002
 counts.fetch(TypeExamples::OtherStatus::PENDING)
+# A default widens the result to its own type, so a nil default makes the result nilable.
+# expect-type-error: 7003
+counts.fetch(TypeExamples::Status::PENDING, nil).abs
 
 # A factory takes its member type from its arguments, so a foreign member widens the set or map it builds rather
 # than being rejected where it is written. The mistyped result is then rejected at its first use.

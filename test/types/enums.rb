@@ -91,6 +91,8 @@ in_flight.subset?(finished)
 counts = consumer.counts
 counts[TypeExamples::Status::SUCCEEDED] = 3
 counts.fetch(TypeExamples::Status::PENDING)
+counts.fetch(TypeExamples::Status::PENDING, 0).abs
+counts.fetch(TypeExamples::Status::PENDING) { |status| consumer.serialize(status).length }.abs
 counts.key?(TypeExamples::Status::RUNNING)
 counts.delete(TypeExamples::Status::RUNNING)
 counts.each do |status, count|

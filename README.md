@@ -129,9 +129,11 @@ notes[Status::RUNNING] # => nil
 
 `keys` returns an `EnumSet`, which makes key algebra across two maps a single `Integer` operation.
 
-`fetch` has no default-argument form, only a block, because an optional value cannot be told apart from a stored
-`nil` without an untyped sentinel.
-It raises `KeyError` when the key is absent and no block is given.
+`fetch` takes a default or a block for an absent key, as `Hash#fetch` does, and a stored `nil` is returned rather than
+the default.
+It raises `KeyError` when the key is absent and neither is given.
+Maps compare with `eql?` and `hash` as a `Hash` does, so a map can be a `Hash` key, though changing it while it is one
+loses that entry.
 
 `EnumHash.of` infers both types from the pairs written at the call site.
 Sorbet cannot solve a type parameter out of a `Hash` literal, so an empty or literal-built map takes its types from a
@@ -196,7 +198,7 @@ Enums of more than 62 members work, but their masks are Bignums, and they are no
 | `[]` | 1.07× slower to 1.02× faster | 2.9–4.0× faster |
 | `key?` | 1.25–1.3× faster | 3.7–4.8× faster |
 | `[]=` | 1.6–1.8× slower | 1.8–2.2× faster |
-| `fetch` | 1.7–1.8× slower | 2.3–2.7× faster |
+| `fetch` | 1.7–2.0× slower | 2.2–2.6× faster |
 | `delete`, then store again | 2.0–2.2× slower | 1.4–1.6× faster |
 | `size` | 2.9–3.5× slower | 2.2–2.3× faster |
 | `size` after a store | 1.6–1.7× slower | 1.8–2.2× faster |

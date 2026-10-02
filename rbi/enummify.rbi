@@ -74,22 +74,22 @@ module Enummify
     Value = type_member
 
     sig do
-      type_parameters(:M, :V)
+      type_parameters(:K, :V)
         .params(
-          enum_class: T.all(T::Class[T.type_parameter(:M)], T.class_of(Enummify::Enum)),
-          entries: T::Hash[T.type_parameter(:M), T.type_parameter(:V)]
+          enum_class: T.all(T::Class[T.type_parameter(:K)], T.class_of(Enummify::Enum)),
+          entries: T::Hash[T.type_parameter(:K), T.type_parameter(:V)]
         )
-        .returns(EnumHash[T.type_parameter(:M), T.type_parameter(:V)])
+        .returns(EnumHash[T.type_parameter(:K), T.type_parameter(:V)])
     end
     def self.from(enum_class, entries); end
 
     sig do
-      type_parameters(:M, :V)
+      type_parameters(:K, :V)
         .params(
-          enum_class: T.all(T::Class[T.type_parameter(:M)], T.class_of(Enummify::Enum)),
-          entries: [T.all(T.type_parameter(:M), Enummify::Enum), T.type_parameter(:V)]
+          enum_class: T.all(T::Class[T.type_parameter(:K)], T.class_of(Enummify::Enum)),
+          entries: [T.all(T.type_parameter(:K), Enummify::Enum), T.type_parameter(:V)]
         )
-        .returns(EnumHash[T.type_parameter(:M), T.type_parameter(:V)])
+        .returns(EnumHash[T.type_parameter(:K), T.type_parameter(:V)])
     end
     def self.of(enum_class, *entries); end
 
@@ -114,13 +114,28 @@ module Enummify
     sig { returns(T::Boolean) }
     def empty?; end
 
+    sig { params(other: T.untyped).returns(T::Boolean) }
+    def eql?(other); end
+
+    # The overloads mirror Hash#fetch, and accept a default or a block but not both.
+    sig { params(member: T.all(Key, Enummify::Enum)).returns(Value) }
     sig do
-      params(
-        member: T.all(Key, Enummify::Enum),
-        block: T.nilable(T.proc.params(member: T.all(Key, Enummify::Enum)).returns(Value))
-      ).returns(Value)
+      type_parameters(:D)
+        .params(member: T.all(Key, Enummify::Enum), default: T.type_parameter(:D))
+        .returns(T.any(Value, T.type_parameter(:D)))
     end
-    def fetch(member, &block); end
+    sig do
+      type_parameters(:D)
+        .params(
+          member: T.all(Key, Enummify::Enum),
+          block: T.proc.params(member: T.all(Key, Enummify::Enum)).returns(T.type_parameter(:D))
+        )
+        .returns(T.any(Value, T.type_parameter(:D)))
+    end
+    def fetch(member, default = T.unsafe(nil), &block); end
+
+    sig { returns(Integer) }
+    def hash; end
 
     sig { returns(String) }
     def inspect; end

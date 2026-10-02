@@ -14,6 +14,14 @@ module Enummify
   # Entries are yielded in declaration order, not insertion order.
   #: [Key, Value]
   class EnumHash
+    # The type of NO_DEFAULT, which lets fetch narrow an omitted default away from a given one.
+    class NoDefault; end
+
+    # The default for an omitted fetch default, which is distinct from every value, including nil.
+    NO_DEFAULT = NoDefault.new.freeze #: NoDefault
+
+    private_constant :NO_DEFAULT, :NoDefault
+
     # Accept type arguments at runtime without depending on sorbet-runtime.
     # This matches T::Generic#[], which also ignores its arguments and returns self, so a consumer can write
     # EnumHash[Status, Integer] inside a sig.
@@ -34,9 +42,9 @@ module Enummify
     end
 
     # Build a map from key and value pairs, which infers both types even when they are written at the call site.
-    #: [M < Enummify::Enum, V] (Class[M] & singleton(Enummify::Enum), *[M & Enummify::Enum, V]) -> EnumHash[M, V]
+    #: [K < Enummify::Enum, V] (Class[K] & singleton(Enummify::Enum), *[K & Enummify::Enum, V]) -> EnumHash[K, V]
     def self.of(enum_class, *entries)
-      result = new(enum_class) #: EnumHash[M, V]
+      result = new(enum_class) #: EnumHash[K, V]
       entries.each { |member, value| result[member] = value }
       result
     end
@@ -64,9 +72,7 @@ module Enummify
     # Equality accepts any object, so unlike the keyed operations it checks what it was given.
     #: (untyped) -> bool
     def ==(other)
-      return false unless other.is_a?(EnumHash)
-
-      other.enum_class.equal?(@enum_class) && other.present == @present && other.entries == @entries
+      same_enum_and_keys?(other) && other.entries == @entries
     end
 
     # Remove every entry, keeping the capacity already allocated for this enum.
@@ -119,9 +125,20 @@ module Enummify
       @present.zero?
     end
 
-    # Return the value for a member, calling the block or raising KeyError when the key is absent.
-    #: (Key & Enummify::Enum) ?{ (Key & Enummify::Enum) -> Value } -> Value
-    def fetch(member, &block)
+    # Like Hash#eql?, this compares values with eql? rather than ==, so a map holding 1 is not eql? to one holding 1.0.
+    #: (untyped) -> bool
+    def eql?(other)
+      same_enum_and_keys?(other) && other.entries.eql?(@entries)
+    end
+
+    # Return the value for a member.
+    # When the key is absent, return the block's result or else the default, and raise KeyError when given neither.
+    # As in Hash#fetch, a block takes precedence over a default.
+    # Hash#fetch also warns when given both, which the exported RBI's overloads reject statically instead.
+    # The optional default measured about 5 ns slower per call in the interpreter whether it defaulted to a constant
+    # or to nil, so the cost is the optional parameter itself, and under YJIT it measured within noise.
+    #: [D] (Key & Enummify::Enum, ?(D | NoDefault)) ?{ (Key & Enummify::Enum) -> D } -> (Value | D)
+    def fetch(member, default = NO_DEFAULT, &block)
       ordinal = member.ordinal
       if @present[ordinal] == 1
         # A present key was written, so the slot holds a value rather than an empty slot.
@@ -130,7 +147,11 @@ module Enummify
       end
       return block.call(member) if block
 
-      raise KeyError, "key not found: #{member.inspect}"
+      # Matching on the class rather than comparing with NO_DEFAULT narrows the default to its type parameter.
+      case default
+      when NoDefault then raise KeyError, "key not found: #{member.inspect}"
+      else default
+      end
     end
 
     # Freeze the map, first caching its keys and freezing its slots.
@@ -138,6 +159,13 @@ module Enummify
     def freeze
       prepare_to_freeze
       super
+    end
+
+    # Maps that are eql? hash alike, so a map can be a Hash key.
+    # Like a Hash, a map that changes while it is a key is no longer found under it.
+    #: () -> Integer
+    def hash
+      [@enum_class, @present, @entries].hash
     end
 
     #: () -> String
@@ -289,6 +317,14 @@ module Enummify
     def prepare_to_freeze
       keys
       @entries.freeze
+    end
+
+    # Check that another object is a map over the same enum with the same keys, which both == and eql? require.
+    #: (untyped) -> bool
+    def same_enum_and_keys?(other)
+      return false unless other.is_a?(EnumHash)
+
+      other.enum_class.equal?(@enum_class) && other.present == @present
     end
   end
 end

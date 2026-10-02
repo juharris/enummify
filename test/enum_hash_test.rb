@@ -93,6 +93,27 @@ module EnumHashTest
     end
 
     #: () -> void
+    def test_eql_maps_are_the_same_hash_key
+      counts = counts_of([Status::PENDING, 1])
+      same = counts_of([Status::PENDING, 1])
+
+      assert(counts.eql?(same))
+      assert_equal(counts.hash, same.hash)
+      assert_equal(:found, { counts => :found }[same])
+      # Like Hash#eql?, values are compared with eql?, so an Integer and an equal Float are == but not eql?.
+      floats = Enummify::EnumHash.of(Status, [Status::PENDING, 1.0])
+      assert_equal(counts, floats)
+      assert_false(counts.eql?(floats))
+      # A stored nil and an absent key leave the same nil slot, so only the keys tell these maps apart.
+      empty = {} #: Hash[Status, Integer?]
+      stored_nil = Enummify::EnumHash.from(Status, empty)
+      stored_nil[Status::PENDING] = nil
+      assert_false(stored_nil.eql?(Enummify::EnumHash.from(Status, empty)))
+      assert_false(counts.eql?(Enummify::EnumHash.of(OtherStatus, [OtherStatus::PENDING, 1])))
+      assert_false(counts.eql?({ Status::PENDING => 1 }))
+    end
+
+    #: () -> void
     def test_equality_is_scoped_to_the_enum_class
       counts = counts_of([Status::PENDING, 1])
 
@@ -107,13 +128,12 @@ module EnumHashTest
     end
 
     #: () -> void
-    def test_fetch_returns_calls_or_raises
+    def test_fetch_returns_calls_defaults_or_raises
       counts = counts_of([Status::PENDING, 1])
 
       assert_equal(1, counts.fetch(Status::PENDING))
 
-      # Unlike Hash#fetch there is no default argument, because an optional value cannot be told apart from a
-      # stored nil without an untyped sentinel. The block is called only when the key is absent.
+      # The block is called only when the key is absent.
       calls = 0
       assert_equal(1, counts.fetch(Status::PENDING) { calls += 1 })
       assert_equal(0, calls)
@@ -122,6 +142,14 @@ module EnumHashTest
 
       # The block receives the missing key, matching Hash#fetch.
       assert_equal(-1, counts.fetch(Status::FAILED) { |member| member.equal?(Status::FAILED) ? -1 : 0 })
+
+      # A default is returned only when the key is absent.
+      assert_equal(1, counts.fetch(Status::PENDING, 0))
+      assert_equal(0, counts.fetch(Status::FAILED, 0))
+      # A nil default is returned rather than mistaken for an omitted one.
+      assert_nil(counts.fetch(Status::FAILED, nil))
+      # As in Hash#fetch, a block takes precedence over a default.
+      assert_equal(7, counts.fetch(Status::FAILED, 0) { 7 })
 
       error = assert_raises(KeyError) { counts.fetch(Status::FAILED) }
       assert_equal('key not found: #<EnumHashTest::Status: "failed">', error.message)
@@ -226,6 +254,8 @@ module EnumHashTest
       assert(counts.key?(Status::PENDING))
       assert_nil(counts[Status::PENDING])
       assert_nil(counts.fetch(Status::PENDING))
+      # A stored nil is a present value, so the default is not used.
+      assert_nil(counts.fetch(Status::PENDING, 0))
       assert_equal(1, counts.size)
       assert_equal([Status::PENDING], counts.keys.to_a)
       assert_equal([nil], counts.values)

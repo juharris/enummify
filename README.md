@@ -38,6 +38,8 @@ Every constant defined directly on the class must be a member of that enum.
 Duplicate serialized values raise immediately.
 
 Each constant assignment immediately registers its member.
+The member count is therefore fixed once the class body finishes.
+`Enum.values`, `EnumSet.all`, complement, and `EnumHash`'s capacity all read from that registry, so a member added dynamically afterwards is invisible to them.
 
 An empty enum returns `[]` from `.values` and `nil` from `.try_deserialize`.
 `.deserialize` raises `ArgumentError` for an unknown string, while `.try_deserialize` returns `nil`.
@@ -51,6 +53,189 @@ require 'json'
 json = JSON.generate(status: Status::RUNNING.serialize) # => '{"status":"RUNNING"}'
 Status.deserialize(JSON.parse(json).fetch('status')) # => Status::RUNNING
 ```
+
+## Sets
+
+`Enummify::EnumSet` is an immutable set of members of a single enum, stored as one `Integer` bitmask.
+Each member occupies the bit at its declaration index, so union, intersection,
+difference and subset tests are single `Integer` operations rather than hash walks.
+
+Every constant in an enum class body must be a member, so a named grouping lives outside the class:
+
+```ruby
+# typed: strict
+
+IN_FLIGHT = Status.set(Status::PENDING, Status::RUNNING)
+
+IN_FLIGHT.include?(Status::RUNNING) # => true
+IN_FLIGHT | Status.set(Status::SUCCEEDED) # => a new set of all three
+~IN_FLIGHT # => the set of every other member
+IN_FLIGHT.to_a # => [Status::PENDING, Status::RUNNING]
+
+case status
+when IN_FLIGHT then 'still working'
+else 'finished'
+end
+```
+
+`Status.set` takes the member type from its arguments, so it needs at least one member.
+Build the other sets with `Enummify::EnumSet.none(Status)`, `Enummify::EnumSet.all(Status)`, or
+`Enummify::EnumSet.from(Status, members)` for a collection you already have.
+`Enummify::EnumSet.of(Status, ...)` is the same as `Status.set` with the enum written out.
+
+Sets are immutable, so `add` and `delete` return a new set rather than changing the receiver.
+`|`, `&`, `-`, `^` and `~` are aliased as `union`, `intersection`, `difference` and `complement`, and
+`subset?`, `superset?`, `disjoint?`, `intersect?` and `empty?` answer without materializing any member.
+
+`EnumSet` includes `Enumerable`, so `map`, `select` and friends are available and return `Array`s, not sets.
+Members are yielded in declaration order.
+`size` and `length` count bits and cache the result; `count` is `Enumerable`'s and walks the members, the same split
+that Ruby's own `Set` has.
+
+Freezing a set caches its members and its size first, so a frozen set reads them as quickly as one that is not frozen.
+A set frozen some other way, such as by `clone(freeze: true)` or `Marshal.load(data, freeze: true)`, still reads
+correctly, but it cannot cache what it had not cached before, so those reads walk its mask every time.
+
+## Maps
+
+`Enummify::EnumHash` is a mutable map keyed by members of a single enum, stored as an array indexed by declaration
+order, so a lookup is an array index rather than a hash of the key.
+
+```ruby
+# typed: strict
+
+counts = Enummify::EnumHash.of(Status, [Status::PENDING, 1], [Status::RUNNING, 2])
+
+counts[Status::PENDING] # => 1
+counts[Status::SUCCEEDED] # => nil
+counts[Status::SUCCEEDED] = 3
+counts.keys # => an EnumSet of the three members
+counts.to_h # => a plain Hash in declaration order
+```
+
+Keys are held in a bitmask alongside the values, so a stored `nil` is distinct from an absent key:
+
+```ruby
+# typed: strict
+
+stored = { Status::PENDING => nil } #: Hash[Status, String?]
+notes = Enummify::EnumHash.from(Status, stored)
+
+notes.key?(Status::PENDING) # => true
+notes[Status::PENDING] # => nil
+notes.key?(Status::RUNNING) # => false
+notes[Status::RUNNING] # => nil
+```
+
+`keys` returns an `EnumSet`, which makes key algebra across two maps a single `Integer` operation.
+
+`fetch` takes a default or a block for an absent key, as `Hash#fetch` does, and a stored `nil` is returned rather than
+the default.
+It raises `KeyError` when the key is absent and neither is given.
+Maps compare with `eql?` and `hash` as a `Hash` does, so a map can be a `Hash` key, though changing it while it is one
+loses that entry.
+
+`EnumHash.of` infers both types from the pairs written at the call site.
+Sorbet cannot solve a type parameter out of a `Hash` literal, so an empty or literal-built map takes its types from a
+`Hash` that is already annotated:
+
+```ruby
+# typed: strict
+
+empty = {} #: Hash[Status, Integer]
+counts = Enummify::EnumHash.from(Status, empty)
+```
+
+Entries are yielded in declaration order of their keys, not in insertion order.
+
+Freezing a map caches its keys and freezes its slots first, and so does `clone` of a frozen map or `clone(freeze: true)`.
+A map frozen by `Marshal.load(data, freeze: true)` still reads correctly, but it rebuilds its keys for every `keys`,
+`each` and `to_h`.
+A frozen map raises `FrozenError` from any call that would change it, before changing anything.
+A call that would change nothing, such as deleting an absent key or merging an empty `Hash`, returns without raising,
+whereas `Hash` raises.
+`dup`, `clone(freeze: false)` and `merge` return maps that are not frozen and that have their own slots.
+
+## Scoped to one enum
+
+Two enums number their members independently, so a set or a map belongs to exactly one enum.
+Mixing them is a type error, and that is the only check:
+
+```ruby
+IN_FLIGHT.include?(OtherStatus::PENDING) # => rejected by Sorbet
+IN_FLIGHT | OtherStatus.set(OtherStatus::PENDING) # => rejected by Sorbet
+```
+
+Nothing is re-checked at runtime, so code that defeats the type checker reads an unrelated bit or slot and gets a
+meaningless answer rather than an exception.
+This is the same trade as the rest of the library: static checking instead of runtime validation.
+
+## Performance
+
+These numbers come from `bundle exec rake benchmark` on Ruby 4.0.7 for arm64-darwin25, under both the interpreter and YJIT.
+They vary by machine, so see [Benchmarks](CONTRIBUTING.md#benchmarks) to re-run them and compare runs from the same machine.
+Each range spans enums of 8, 40 and 62 members.
+Enums of more than 62 members work, but their masks are Bignums, and they are not a performance target.
+
+`EnumSet` compared with `Set`:
+
+| Operation | Interpreter | YJIT |
+| --- | --- | --- |
+| `\|`, `&`, `-` and chained `(a \| b) & c` | 2.1–15× faster | 7.0–50× faster |
+| `subset?` | 3.9–22× faster | 21–115× faster |
+| `include?` | 1.25–1.5× faster | 3.4–5.5× faster |
+| `size` | 1.3–1.4× slower | 1.08–1.23× faster |
+| `size` of a new union | 1.6–3.7× faster | 3.6–6.1× faster |
+| build from an `Array` | 1.10–1.4× faster | 4.2–5.9× faster |
+| `each` | 1.00–1.14× faster | 1.12–1.17× faster |
+| `map` | 1.6× faster | 1.5–1.8× faster |
+| `each` of a new union | 1.5–1.7× slower | 1.22–1.4× faster |
+
+`EnumHash` compared with `Hash`:
+
+| Operation | Interpreter | YJIT |
+| --- | --- | --- |
+| `[]` | 1.07× slower to 1.02× faster | 2.9–4.0× faster |
+| `key?` | 1.25–1.3× faster | 3.7–4.8× faster |
+| `[]=` | 1.6–1.8× slower | 1.8–2.2× faster |
+| `fetch` | 1.7–2.0× slower | 2.2–2.6× faster |
+| `delete`, then store again | 2.0–2.2× slower | 1.4–1.6× faster |
+| `size` | 2.9–3.5× slower | 2.2–2.3× faster |
+| `size` after a store | 1.6–1.7× slower | 1.8–2.2× faster |
+| `each` | 2.0–2.1× slower | 1.8–2.1× faster |
+| `keys & keys` across two maps | 1.4–15× faster | 4.6–52× faster |
+| `merge` | 1.7–3.4× slower | 1.4× slower to 1.8× faster |
+| build by storing every member | 1.25–1.7× slower | 1.29–2.3× faster |
+
+Whole-set algebra is where the bitmask wins, and its lead generally grows with the member count, because `Set`'s cost grows with it and a mask's barely does.
+YJIT widens most leads and turns most of the interpreter's losses into wins.
+
+Memory, in bytes owned by each container, not counting the members and values it refers to:
+
+| Container | `Set` or `Hash`, 8 members | Enummify, 8 members | `Set` or `Hash`, 62 members | Enummify, 62 members |
+| --- | ---: | ---: | ---: | ---: |
+| empty set | 144 | 80 | 144 | 80 |
+| full set | 208 | 80 | 1232 | 80 |
+| full set, once iterated | 208 | 184 | 1232 | 616 |
+| empty map | 160 | 160 | 160 | 720 |
+| full map | 160 | 160 | 1744 | 720 |
+| full map, once its keys are read | 160 | 240 | 1744 | 800 |
+
+A mask of 62 bits or fewer is an immediate `Integer` costing nothing beyond the object that holds it, so a set that
+has not been iterated allocates no storage of its own.
+An `EnumHash` allocates a slot for every member up front, so an empty or sparse map is larger than the `Hash` it replaces.
+
+A set materializes and caches its member `Array` the first time it is iterated, because walking a mask in Ruby is
+slower than iterating an `Array`.
+That first walk is what `each` of a new union measures.
+Set algebra never materializes, which is what keeps chained operations cheap.
+
+An `EnumHash` counts its keys as they are added and removed, so `size` reads a number rather than counting bits.
+Keeping that count costs about 5–7 ns for each added or removed key in the interpreter, and 1–2 ns under YJIT.
+Overwriting a present key changes neither the count nor the cached `keys`, so only adding or removing a key discards
+that set.
+`each` walks the cached key set in Ruby, which YJIT compiles but the interpreter runs slower than `Hash`'s C loop.
+`merge` copies the map and then copies the other map's present slots directly, so the copy dominates for small enums.
 
 ## Typing
 

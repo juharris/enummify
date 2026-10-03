@@ -50,6 +50,12 @@ module EnumTest
     end
 
     #: () -> void
+    def test_bits_are_shifted_by_ordinal
+      # EnumSet and EnumHash mask by the bit but index by the ordinal, so the two must agree for every member.
+      fixture_members.each { |member| assert_equal(1 << member.ordinal, member.bit, member.inspect) }
+    end
+
+    #: () -> void
     def test_case_matches_members
       result = case Status::RUNNING
                when Status::PENDING then :waiting
@@ -192,6 +198,28 @@ module EnumTest
         assert_predicate(value.serialize, :frozen?)
         error = assert_raises(FrozenError) { value.instance_variable_set(:@extra, true) }
         assert_equal(expected_message, error.message)
+      end
+    end
+
+    #: () -> void
+    def test_ordinals_are_dense_and_assigned_before_freezing
+      # EnumSet indexes a bitmask by ordinal and EnumHash indexes an array by it, so a gap, a repeat, or an order
+      # that does not match values would silently corrupt both.
+      enum = Class.new(Enummify::Enum) do
+        const_set(:ZULU, new)
+        const_set(:ALPHA, new)
+        const_set(:MIKE, new)
+      end
+
+      assert_equal([0, 1, 2], enum.values.map(&:ordinal))
+
+      # Registration freezes each member, so an ordinal that was assigned at all was written before the freeze.
+      enum.values.each { |member| assert_predicate(member, :frozen?) }
+
+      fixture_members.group_by(&:class).each_value do |members|
+        members.each_with_index do |member, index|
+          assert_equal(index, member.ordinal, member.inspect)
+        end
       end
     end
 

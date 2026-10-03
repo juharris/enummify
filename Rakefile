@@ -11,6 +11,16 @@ Rake::TestTask.new do |task|
   task.test_files = FileList['test/**/*_test.rb']
 end
 
+# The interpreter and YJIT disagree on which operations win, so every benchmark runs under both.
+BENCHMARK_RUBY_OPTIONS = [[], ['--yjit']].freeze #: Array[Array[String]]
+
+desc 'Compare EnumSet and EnumHash against Set and Hash under the interpreter and YJIT, which takes minutes'
+task :benchmark do
+  BENCHMARK_RUBY_OPTIONS.product(FileList['benchmark/*_benchmark.rb']).each do |options, file|
+    ruby(*options, file)
+  end
+end
+
 desc 'Build and verify the installed gem and its exported RBI'
 task 'test:package' => :build do
   ruby 'test/check_package.rb'

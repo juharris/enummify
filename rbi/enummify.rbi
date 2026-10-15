@@ -29,6 +29,8 @@ module Enummify
     sig { returns(T::Array[T.attached_class]) }
     def self.values; end
 
+    private_class_method :new
+
     sig { params(_depth: Integer).returns(String) }
     def _dump(_depth); end
 

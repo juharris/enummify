@@ -202,6 +202,13 @@ module EnumTest
     end
 
     #: () -> void
+    def test_new_is_private_outside_the_class_body
+      error = assert_raises(NoMethodError) { Status.new('extra') } #: as NoMethodError
+      assert_equal(:new, error.name)
+      assert_equal([Status::PENDING, Status::RUNNING], Status.values)
+    end
+
+    #: () -> void
     def test_ordinals_are_dense_and_assigned_before_freezing
       # EnumSet indexes a bitmask by ordinal and EnumHash indexes an array by it, so a gap, a repeat, or an order
       # that does not match values would silently corrupt both.
@@ -288,7 +295,7 @@ module EnumTest
 
     #: (singleton(Enummify::Enum), Symbol, ?String?) -> Enummify::Enum
     def declare_member(enum, name, serialization = nil)
-      enum.const_set(name, enum.new(serialization)) #: as Enummify::Enum
+      enum.const_set(name, enum.send(:new, serialization)) #: as Enummify::Enum
     end
 
     #: (singleton(Enummify::Enum), Symbol) -> Enummify::Enum

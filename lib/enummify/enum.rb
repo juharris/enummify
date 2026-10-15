@@ -64,7 +64,9 @@ module Enummify
       subclass.instance_variable_set(:@serialized_to_value, {})
     end
 
-    private_class_method :const_added, :inherited
+    # Members are registered only when assigned to a constant, so an instance built outside the class body would be
+    # unregistered and its ordinal would reach another member's slot.
+    private_class_method :const_added, :inherited, :new
 
     # Store only the serialized string so Marshal loading uses the registered member.
     #: (Integer) -> String
